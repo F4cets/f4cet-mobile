@@ -3,8 +3,10 @@ package com.f4cets.mobile
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,9 +23,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.List
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Face
 import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FloatingActionButton
@@ -43,6 +46,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale // CHANGED: Added missing import
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -100,57 +104,66 @@ data class AffiliateClick(
     val timestamp: String = ""
 )
 
+data class MarketplaceItem(
+    val productId: String = "",
+    val imageUrl: String = ""
+)
+
+data class AffiliateItem(
+    val affiliateId: String = "",
+    val name: String = "",
+    val logoUrl: String = ""
+)
+
 @Composable
 fun MainScreen() {
     var affiliateClicks by remember { mutableStateOf<List<AffiliateClick>>(emptyList()) }
     var logoUrls by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var userProfile by remember { mutableStateOf<User.Profile?>(null) }
+    var marketplaceItems by remember { mutableStateOf<List<MarketplaceItem>>(emptyList()) }
+    var affiliateItems by remember { mutableStateOf<List<AffiliateItem>>(emptyList()) }
+    var isFabMenuExpanded by remember { mutableStateOf(false) }
 
-    // CHANGED: Fetch affiliate clicks, logos, and avatar from Firestore with proper state management
     LaunchedEffect(Unit) {
         val db = FirebaseFirestore.getInstance()
-        val storage = FirebaseStorage.getInstance()
         val walletId = "2FbdM2GpXGPgkt8tFEWSyjfiZH2Un2qx7rcm78coSbh7"
         
         // Fetch affiliate clicks
-        val documents = db.collection("users")
+        val clickDocuments = db.collection("users")
             .document(walletId)
             .collection("affiliateClicks")
             .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
             .limit(10)
             .get()
             .await()
-        val clicks = documents.mapNotNull { doc ->
+        val clicks = clickDocuments.mapNotNull { doc ->
             val affiliateName = doc.getString("affiliateName") ?: return@mapNotNull null
             val timestamp = doc.getString("timestamp") ?: return@mapNotNull null
             AffiliateClick(affiliateName, timestamp)
         }
         affiliateClicks = clicks
 
-        // Fetch logo URLs for each affiliate
+        // Fetch affiliate logo URLs for clicks
         val urlMap = mutableMapOf<String, String>()
-        for (click in clicks) {
-            val extensions = listOf(".png", ".jpg", ".jpeg", ".webp")
-            var urlFound = false
-            for (ext in extensions) {
-                if (!urlFound) {
-                    val storageRef = storage.getReference("affiliates/${click.affiliateName}/logo$ext")
-                    try {
-                        val url = storageRef.downloadUrl.await().toString()
-                        urlMap[click.affiliateName] = url
-                        urlFound = true
-                    } catch (e: Exception) {
-                        println("Error fetching $ext for ${click.affiliateName}: $e")
+        if (clicks.isNotEmpty()) {
+            val affiliateNames = clicks.map { it.affiliateName }.distinct()
+            affiliateNames.chunked(10).forEach { chunk ->
+                val affiliateDocs = db.collection("affiliates")
+                    .whereIn("name", chunk)
+                    .get()
+                    .await()
+                affiliateDocs.documents.forEach { doc ->
+                    val name = doc.getString("name") ?: ""
+                    val logoUrl = doc.getString("logoUrl") ?: ""
+                    if (name.isNotEmpty()) {
+                        urlMap[name] = logoUrl
                     }
                 }
-            }
-            if (!urlFound) {
-                urlMap[click.affiliateName] = "" // Fallback if no valid extension
             }
         }
         logoUrls = urlMap
 
-        // Fetch user profile with proper deserialization
+        // Fetch user profile
         val profileDoc = db.collection("users")
             .document(walletId)
             .get()
@@ -159,13 +172,40 @@ fun MainScreen() {
         userProfile = if (profileMap != null) {
             User.Profile(
                 name = profileMap["name"] as? String ?: "User",
-                avatar = profileMap["avatar"] as? String ?: "/assets/images/default-avatar.png",
+                avatar = profileMap["avatar"] as? String ?: "",
                 email = profileMap["email"] as? String ?: "",
                 nfts = (profileMap["nfts"] as? List<Map<String, Any>>) ?: emptyList()
             )
         } else {
             null
         }
+
+        // Fetch first 10 marketplace items
+        val productDocuments = db.collection("products")
+            .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .limit(10)
+            .get()
+            .await()
+        val items = productDocuments.mapNotNull { doc ->
+            val productId = doc.id
+            val imageUrl = doc.getString("selectedImage") ?: return@mapNotNull null
+            MarketplaceItem(productId, imageUrl)
+        }
+        marketplaceItems = items
+
+        // Fetch first 10 affiliates
+        val affiliateDocuments = db.collection("affiliates")
+            .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .limit(10)
+            .get()
+            .await()
+        val affiliates = affiliateDocuments.mapNotNull { doc ->
+            val affiliateId = doc.id
+            val name = doc.getString("name") ?: return@mapNotNull null
+            val logoUrl = doc.getString("logoUrl") ?: ""
+            AffiliateItem(affiliateId, name, logoUrl)
+        }
+        affiliateItems = affiliates
     }
 
     Scaffold(
@@ -182,7 +222,6 @@ fun MainScreen() {
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
-                // CHANGED: Improved state management for avatar display
                 Surface(
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.secondary,
@@ -195,8 +234,8 @@ fun MainScreen() {
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        val avatarUrl = userProfile?.avatar // Local variable to handle state
-                        if (avatarUrl != null) {
+                        val avatarUrl = userProfile?.avatar ?: ""
+                        if (avatarUrl.isNotEmpty()) {
                             AsyncImage(
                                 model = avatarUrl,
                                 contentDescription = "User Avatar",
@@ -213,7 +252,6 @@ fun MainScreen() {
                         }
                     }
                 }
-                // Shopping Cart FAB
                 FloatingActionButton(
                     onClick = { /* Placeholder for shopping cart action */ },
                     containerColor = MaterialTheme.colorScheme.primary,
@@ -309,13 +347,21 @@ fun MainScreen() {
                                             modifier = Modifier.fillMaxSize(),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            AsyncImage(
-                                                model = logoUrl,
-                                                contentDescription = "Affiliate Logo for ${click.affiliateName}",
-                                                modifier = Modifier.fillMaxSize(),
-                                                contentScale = ContentScale.Crop,
-                                                error = painterResource(id = R.drawable.bgf)
-                                            )
+                                            if (logoUrl.isNotEmpty()) {
+                                                AsyncImage(
+                                                    model = logoUrl,
+                                                    contentDescription = "Affiliate Logo for ${click.affiliateName}",
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentScale = ContentScale.Crop,
+                                                    error = painterResource(id = R.drawable.bgf)
+                                                )
+                                            } else {
+                                                Text(
+                                                    text = click.affiliateName.take(1),
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    textAlign = TextAlign.Center
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -338,14 +384,12 @@ fun MainScreen() {
                     item {
                         Spacer(modifier = Modifier.height(16.dp))
                     }
-
-                    // Second Row: Marketplace (Large Cards)
                     item {
                         LazyRow(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
                         ) {
-                            items((1..10).toList()) { index ->
+                            items(marketplaceItems) { product ->
                                 ElevatedCard(
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                                     modifier = Modifier
@@ -355,10 +399,12 @@ fun MainScreen() {
                                         modifier = Modifier.fillMaxSize(),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text(
-                                            text = "Market Item $index",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            textAlign = TextAlign.Center
+                                        AsyncImage(
+                                            model = product.imageUrl,
+                                            contentDescription = "Marketplace Item ${product.productId}",
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentScale = ContentScale.Crop,
+                                            error = painterResource(id = R.drawable.bgf)
                                         )
                                     }
                                 }
@@ -381,14 +427,12 @@ fun MainScreen() {
                     item {
                         Spacer(modifier = Modifier.height(16.dp))
                     }
-
-                    // Third Row: Affiliates (Large Cards)
                     item {
                         LazyRow(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
                         ) {
-                            items((1..10).toList()) { index ->
+                            items(affiliateItems) { affiliate ->
                                 ElevatedCard(
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                                     modifier = Modifier
@@ -398,11 +442,21 @@ fun MainScreen() {
                                         modifier = Modifier.fillMaxSize(),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text(
-                                            text = "Store $index",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            textAlign = TextAlign.Center
-                                        )
+                                        if (affiliate.logoUrl.isNotEmpty()) {
+                                            AsyncImage(
+                                                model = affiliate.logoUrl,
+                                                contentDescription = "Affiliate Logo for ${affiliate.name}",
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentScale = ContentScale.Crop,
+                                                error = painterResource(id = R.drawable.bgf)
+                                            )
+                                        } else {
+                                            Text(
+                                                text = affiliate.name.take(1),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                textAlign = TextAlign.Center
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -428,42 +482,68 @@ fun MainScreen() {
                         Spacer(modifier = Modifier.height(100.dp))
                     }
                 }
-                // Floating Toolbar
-                Surface(
-                    shape = RoundedCornerShape(24.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    tonalElevation = 8.dp,
+                Box(
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
-                        .height(48.dp)
+                        .align(Alignment.BottomEnd)
+                        .padding(bottom = 16.dp, end = 16.dp)
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
-                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
                     ) {
-                        IconButton(onClick = { /* Placeholder for Home action */ }) {
-                            Icon(
-                                imageVector = Icons.Outlined.Home,
-                                contentDescription = "Home",
-                                tint = MaterialTheme.colorScheme.onPrimary
-                            )
+                        // Secondary FABs (shown when expanded)
+                        val scale by animateFloatAsState(if (isFabMenuExpanded) 1f else 0f)
+                        if (isFabMenuExpanded) {
+                            FloatingActionButton(
+                                onClick = { /* Placeholder for Receipt action */ },
+                                containerColor = MaterialTheme.colorScheme.secondary,
+                                contentColor = MaterialTheme.colorScheme.onSecondary,
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .scale(scale)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Face,
+                                    contentDescription = "Receipt"
+                                )
+                            }
+                            FloatingActionButton(
+                                onClick = { /* Placeholder for Search action */ },
+                                containerColor = MaterialTheme.colorScheme.secondary,
+                                contentColor = MaterialTheme.colorScheme.onSecondary,
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .scale(scale)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Search,
+                                    contentDescription = "Search"
+                                )
+                            }
+                            FloatingActionButton(
+                                onClick = { /* Placeholder for Home action */ },
+                                containerColor = MaterialTheme.colorScheme.secondary,
+                                contentColor = MaterialTheme.colorScheme.onSecondary,
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .scale(scale)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Home,
+                                    contentDescription = "Home"
+                                )
+                            }
                         }
-                        IconButton(onClick = { /* Placeholder for Search action */ }) {
+                        // Primary FAB
+                        FloatingActionButton(
+                            onClick = { isFabMenuExpanded = !isFabMenuExpanded },
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(56.dp)
+                        ) {
                             Icon(
-                                imageVector = Icons.Outlined.Search,
-                                contentDescription = "Search",
-                                tint = MaterialTheme.colorScheme.onPrimary
-                            )
-                        }
-                        IconButton(onClick = { /* Placeholder for Receipt action */ }) {
-                            Icon(
-                                imageVector = Icons.Outlined.Check,
-                                contentDescription = "Receipt",
-                                tint = MaterialTheme.colorScheme.onPrimary
+                                imageVector = if (isFabMenuExpanded) Icons.Outlined.Close else Icons.Outlined.Add,
+                                contentDescription = if (isFabMenuExpanded) "Close Menu" else "Open Menu"
                             )
                         }
                     }
