@@ -11,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId = "com.f4cets.mobile"
-        minSdk = 24 // Increased to 24 for Solana Mobile Wallet Adapter
+        minSdk = 24
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
@@ -75,6 +75,12 @@ dependencies {
     implementation("com.solanamobile:web3-solana:0.2.5")
     implementation("com.solanamobile:rpc-core:0.2.7")
     implementation("io.github.funkatronics:multimult:0.2.3")
+
+    // Jetpack Navigation for Compose
+    implementation("androidx.navigation:navigation-compose:2.8.3")
+
+    // Coil for Image Loading
+    implementation("io.coil-kt:coil-compose:2.7.0")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

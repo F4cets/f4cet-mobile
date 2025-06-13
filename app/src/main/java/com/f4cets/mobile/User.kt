@@ -2,7 +2,7 @@ package com.f4cets.mobile
 
 data class User(
     val walletId: String = "",
-    val role: String = "buyer", // Default to "buyer", can be "seller" or "admin"
+    val role: String = "buyer", // Default to "buyer", can be "seller" or "god"
     val isActive: Boolean = true,
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L,

@@ -87,11 +87,11 @@ fun HomePrescreen(navigateToMain: () -> Unit) {
                 LaunchedEffect(Unit) {
                     while (true) {
                         rotation.animateTo(
-                            targetValue = 5f,
+                            targetValue = 3f,
                             animationSpec = tween(durationMillis = 1000, easing = LinearEasing)
                         )
                         rotation.animateTo(
-                            targetValue = -5f,
+                            targetValue = -3f,
                             animationSpec = tween(durationMillis = 1000, easing = LinearEasing)
                         )
                         rotation.animateTo(
