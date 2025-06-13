@@ -5,15 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -21,32 +13,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.List
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Face
-import androidx.compose.material.icons.outlined.ShoppingCart
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.outlined.Face
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.List
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale // CHANGED: Added missing import
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -58,11 +35,10 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import coil.compose.AsyncImage
 import com.f4cets.mobile.ui.theme.F4cetMobileTheme
 import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.storage.FirebaseStorage
-import coil.compose.AsyncImage
 import kotlinx.coroutines.tasks.await
 
 class MainActivity : ComponentActivity() {
@@ -85,6 +61,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
+    var userProfile by remember { mutableStateOf<User.Profile?>(null) } // CHANGED: Shared state for userProfile
+
     NavHost(navController = navController, startDestination = "homePrescreen") {
         composable("homePrescreen") {
             HomePrescreen(navigateToMain = {
@@ -94,7 +72,17 @@ fun AppNavigation() {
             })
         }
         composable("mainScreen") {
-            MainScreen()
+            MainScreen(
+                userProfile = userProfile,
+                onUserProfileUpdated = { userProfile = it }, // CHANGED: Update shared state
+                navigateToAffiliates = { navController.navigate("affiliatesScreen") }
+            )
+        }
+        composable("affiliatesScreen") {
+            AffiliatesScreen(
+                userProfile = userProfile,
+                navigateBack = { navController.popBackStack() }
+            )
         }
     }
 }
@@ -116,10 +104,13 @@ data class AffiliateItem(
 )
 
 @Composable
-fun MainScreen() {
+fun MainScreen(
+    userProfile: User.Profile?, // CHANGED: Accept userProfile as parameter
+    onUserProfileUpdated: (User.Profile?) -> Unit, // CHANGED: Callback to update shared state
+    navigateToAffiliates: () -> Unit // CHANGED: Added navigation callback
+) {
     var affiliateClicks by remember { mutableStateOf<List<AffiliateClick>>(emptyList()) }
     var logoUrls by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
-    var userProfile by remember { mutableStateOf<User.Profile?>(null) }
     var marketplaceItems by remember { mutableStateOf<List<MarketplaceItem>>(emptyList()) }
     var affiliateItems by remember { mutableStateOf<List<AffiliateItem>>(emptyList()) }
     var isFabMenuExpanded by remember { mutableStateOf(false) }
@@ -169,7 +160,7 @@ fun MainScreen() {
             .get()
             .await()
         val profileMap = profileDoc.get("profile") as? Map<*, *>
-        userProfile = if (profileMap != null) {
+        val newProfile = if (profileMap != null) {
             User.Profile(
                 name = profileMap["name"] as? String ?: "User",
                 avatar = profileMap["avatar"] as? String ?: "",
@@ -179,6 +170,7 @@ fun MainScreen() {
         } else {
             null
         }
+        onUserProfileUpdated(newProfile) // CHANGED: Update shared state
 
         // Fetch first 10 marketplace items
         val productDocuments = db.collection("products")
@@ -508,7 +500,7 @@ fun MainScreen() {
                                 )
                             }
                             FloatingActionButton(
-                                onClick = { /* Placeholder for Search action */ },
+                                onClick = { navigateToAffiliates() }, // CHANGED: Navigate to AffiliatesScreen
                                 containerColor = MaterialTheme.colorScheme.secondary,
                                 contentColor = MaterialTheme.colorScheme.onSecondary,
                                 modifier = Modifier
@@ -557,6 +549,10 @@ fun MainScreen() {
 @Composable
 fun MainScreenPreview() {
     F4cetMobileTheme {
-        MainScreen()
+        MainScreen(
+            userProfile = null,
+            onUserProfileUpdated = {},
+            navigateToAffiliates = {}
+        ) // CHANGED: Updated for preview
     }
 }
