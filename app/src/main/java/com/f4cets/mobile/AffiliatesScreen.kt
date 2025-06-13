@@ -1,11 +1,14 @@
 package com.f4cets.mobile
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -23,46 +26,96 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.f4cets.mobile.ui.theme.F4cetMobileTheme
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.time.Instant
 
 @Composable
 fun AffiliatesScreen(
     userProfile: User.Profile?,
-    navigateBack: () -> Unit // For navigation back to MainScreen
+    navigateBack: () -> Unit
 ) {
     var affiliateItems by remember { mutableStateOf<List<AffiliateItem>>(emptyList()) }
     var searchQuery by remember { mutableStateOf("") }
     var isFabMenuExpanded by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+    var lastDocument by remember { mutableStateOf<DocumentSnapshot?>(null) }
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    val walletId = "2FbdM2GpXGPgkt8tFEWSyjfiZH2Un2qx7rcm78coSbh7"
+    val context = LocalContext.current
 
+    // Load initial or searched affiliates
     LaunchedEffect(searchQuery) {
+        isLoading = true
         val db = FirebaseFirestore.getInstance()
-        val query = if (searchQuery.isNotEmpty()) {
+        val normalizedQuery = searchQuery.trim().lowercase() // Normalize search query
+        val query = if (normalizedQuery.isNotEmpty()) {
             db.collection("affiliates")
-                .whereGreaterThanOrEqualTo("name", searchQuery)
-                .whereLessThanOrEqualTo("name", searchQuery + "\uf8ff")
+                .whereGreaterThanOrEqualTo("name", normalizedQuery)
+                .whereLessThanOrEqualTo("name", normalizedQuery + "\uf8ff")
                 .orderBy("name")
-                .limit(10)
+                .limit(30)
         } else {
             db.collection("affiliates")
-                .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
-                .limit(10)
+                .orderBy("createdAt")
+                .limit(30)
         }
         val affiliateDocuments = query.get().await()
         val affiliates = affiliateDocuments.mapNotNull { doc ->
             val affiliateId = doc.id
             val name = doc.getString("name") ?: return@mapNotNull null
             val logoUrl = doc.getString("logoUrl") ?: ""
-            AffiliateItem(affiliateId, name, logoUrl) // CHANGED: Removed 'link' argument
+            AffiliateItem(affiliateId, name, logoUrl)
         }
-        affiliateItems = affiliates
+        affiliateItems = affiliates // Update only when results are fetched
+        lastDocument = affiliateDocuments.documents.lastOrNull()
+        isLoading = false
+    }
+
+    // Load more affiliates on scroll
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex + listState.layoutInfo.visibleItemsInfo.size }
+            .collect { visibleItemCount ->
+                if (!isLoading && visibleItemCount >= affiliateItems.size - 5 && lastDocument != null) {
+                    isLoading = true
+                    val db = FirebaseFirestore.getInstance()
+                    val normalizedQuery = searchQuery.trim().lowercase()
+                    val query = if (normalizedQuery.isNotEmpty()) {
+                        db.collection("affiliates")
+                            .whereGreaterThanOrEqualTo("name", normalizedQuery)
+                            .whereLessThanOrEqualTo("name", normalizedQuery + "\uf8ff")
+                            .orderBy("name")
+                            .startAfter(lastDocument)
+                            .limit(30)
+                    } else {
+                        db.collection("affiliates")
+                            .orderBy("createdAt")
+                            .startAfter(lastDocument)
+                            .limit(30)
+                    }
+                    val affiliateDocuments = query.get().await()
+                    val newAffiliates = affiliateDocuments.mapNotNull { doc ->
+                        val affiliateId = doc.id
+                        val name = doc.getString("name") ?: return@mapNotNull null
+                        val logoUrl = doc.getString("logoUrl") ?: ""
+                        AffiliateItem(affiliateId, name, logoUrl)
+                    }
+                    affiliateItems = affiliateItems + newAffiliates
+                    lastDocument = affiliateDocuments.documents.lastOrNull()
+                    isLoading = false
+                }
+            }
     }
 
     Scaffold(
@@ -162,6 +215,7 @@ fun AffiliatesScreen(
                     }
                 }
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(top = 192.dp, start = 16.dp, end = 16.dp)
@@ -177,70 +231,78 @@ fun AffiliatesScreen(
                             textAlign = TextAlign.Start
                         )
                     }
-                    item {
-                        LazyRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    items(affiliateItems) { affiliate ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp)
+                                .widthIn(min = 200.dp, max = 300.dp)
                         ) {
-                            if (affiliateItems.isEmpty()) {
-                                item {
-                                    ElevatedCard(
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                        modifier = Modifier
-                                            .size(width = 200.dp, height = 180.dp)
-                                    ) {
-                                        Box(
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = "No Affiliates Found",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                textAlign = TextAlign.Center
-                                            )
+                            ElevatedCard(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(3f / 2f) // CHANGED: 3:2 ratio for 600x400
+                                    .clickable {
+                                        coroutineScope.launch {
+                                            // Track click
+                                            val db = FirebaseFirestore.getInstance()
+                                            db.collection("users")
+                                                .document(walletId)
+                                                .collection("affiliateClicks")
+                                                .add(
+                                                    mapOf(
+                                                        "affiliateName" to affiliate.name,
+                                                        "timestamp" to Instant.now().toString()
+                                                    )
+                                                ).await()
+                                            // Open link (placeholder)
+                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.example.com"))
+                                            context.startActivity(intent)
                                         }
                                     }
-                                }
-                            } else {
-                                items(affiliateItems) { affiliate ->
-                                    ElevatedCard(
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                        modifier = Modifier
-                                            .size(width = 200.dp, height = 180.dp)
-                                    ) {
-                                        Box(
+                            ) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (affiliate.logoUrl.isNotEmpty()) {
+                                        AsyncImage(
+                                            model = affiliate.logoUrl,
+                                            contentDescription = "Affiliate Logo for ${affiliate.name}",
                                             modifier = Modifier.fillMaxSize(),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            if (affiliate.logoUrl.isNotEmpty()) {
-                                                AsyncImage(
-                                                    model = affiliate.logoUrl,
-                                                    contentDescription = "Affiliate Logo for ${affiliate.name}",
-                                                    modifier = Modifier.fillMaxSize(),
-                                                    contentScale = ContentScale.Crop,
-                                                    error = painterResource(id = R.drawable.bgf)
-                                                )
-                                            } else {
-                                                Text(
-                                                    text = affiliate.name.take(1),
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    textAlign = TextAlign.Center
-                                                )
-                                            }
-                                            Text(
-                                                text = affiliate.name,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurface,
-                                                modifier = Modifier
-                                                    .align(Alignment.BottomCenter)
-                                                    .padding(8.dp)
-                                                    .fillMaxWidth(),
-                                                textAlign = TextAlign.Center
-                                            )
-                                        }
+                                            contentScale = ContentScale.Fit, // CHANGED: Fit to avoid cropping
+                                            error = painterResource(id = R.drawable.bgf)
+                                        )
+                                    } else {
+                                        Text(
+                                            text = affiliate.name.take(1),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            textAlign = TextAlign.Center
+                                        )
                                     }
+                                    Text(
+                                        text = affiliate.name,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier
+                                            .align(Alignment.BottomCenter)
+                                            .padding(8.dp)
+                                            .fillMaxWidth(),
+                                        textAlign = TextAlign.Center
+                                    )
                                 }
                             }
+                        }
+                    }
+                    if (isLoading) {
+                        item {
+                            CircularProgressIndicator(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                color = MaterialTheme.colorScheme.primary
+                            )
                         }
                     }
                     item {

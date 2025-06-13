@@ -61,7 +61,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
-    var userProfile by remember { mutableStateOf<User.Profile?>(null) } // CHANGED: Shared state for userProfile
+    var userProfile by remember { mutableStateOf<User.Profile?>(null) }
 
     NavHost(navController = navController, startDestination = "homePrescreen") {
         composable("homePrescreen") {
@@ -74,7 +74,7 @@ fun AppNavigation() {
         composable("mainScreen") {
             MainScreen(
                 userProfile = userProfile,
-                onUserProfileUpdated = { userProfile = it }, // CHANGED: Update shared state
+                onUserProfileUpdated = { userProfile = it },
                 navigateToAffiliates = { navController.navigate("affiliatesScreen") }
             )
         }
@@ -100,14 +100,15 @@ data class MarketplaceItem(
 data class AffiliateItem(
     val affiliateId: String = "",
     val name: String = "",
-    val logoUrl: String = ""
+    val logoUrl: String = "",
+    val cryptoBackOffer: String = "" // CHANGED: Added cryptoBackOffer
 )
 
 @Composable
 fun MainScreen(
-    userProfile: User.Profile?, // CHANGED: Accept userProfile as parameter
-    onUserProfileUpdated: (User.Profile?) -> Unit, // CHANGED: Callback to update shared state
-    navigateToAffiliates: () -> Unit // CHANGED: Added navigation callback
+    userProfile: User.Profile?,
+    onUserProfileUpdated: (User.Profile?) -> Unit,
+    navigateToAffiliates: () -> Unit
 ) {
     var affiliateClicks by remember { mutableStateOf<List<AffiliateClick>>(emptyList()) }
     var logoUrls by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
@@ -170,7 +171,7 @@ fun MainScreen(
         } else {
             null
         }
-        onUserProfileUpdated(newProfile) // CHANGED: Update shared state
+        onUserProfileUpdated(newProfile)
 
         // Fetch first 10 marketplace items
         val productDocuments = db.collection("products")
@@ -195,7 +196,8 @@ fun MainScreen(
             val affiliateId = doc.id
             val name = doc.getString("name") ?: return@mapNotNull null
             val logoUrl = doc.getString("logoUrl") ?: ""
-            AffiliateItem(affiliateId, name, logoUrl)
+            val cryptoBackOffer = doc.getString("cryptoBackOffer") ?: "" // CHANGED: Fetch cryptoBackOffer
+            AffiliateItem(affiliateId, name, logoUrl, cryptoBackOffer)
         }
         affiliateItems = affiliates
     }
@@ -500,7 +502,7 @@ fun MainScreen(
                                 )
                             }
                             FloatingActionButton(
-                                onClick = { navigateToAffiliates() }, // CHANGED: Navigate to AffiliatesScreen
+                                onClick = { navigateToAffiliates() },
                                 containerColor = MaterialTheme.colorScheme.secondary,
                                 contentColor = MaterialTheme.colorScheme.onSecondary,
                                 modifier = Modifier
@@ -553,6 +555,6 @@ fun MainScreenPreview() {
             userProfile = null,
             onUserProfileUpdated = {},
             navigateToAffiliates = {}
-        ) // CHANGED: Updated for preview
+        )
     }
 }
