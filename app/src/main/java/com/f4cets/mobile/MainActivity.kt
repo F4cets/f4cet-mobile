@@ -436,7 +436,7 @@ fun MainScreen() {
                                 ElevatedCard(
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                                     modifier = Modifier
-                                        .size(width = 200.dp, height = 180.dp)
+                                        .size(width = 300.dp, height = 180.dp)
                                 ) {
                                     Box(
                                         modifier = Modifier.fillMaxSize(),
