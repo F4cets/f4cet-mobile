@@ -37,7 +37,6 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.f4cets.mobile.model.AffiliateItem
 import com.f4cets.mobile.ui.theme.F4cetMobileTheme
-import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -52,118 +51,45 @@ fun AffiliatesScreen(
     var searchQuery by remember { mutableStateOf("") }
     var isFabMenuExpanded by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
-    var lastDocument by remember { mutableStateOf<DocumentSnapshot?>(null) }
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val walletId = "2FbdM2GpXGPgkt8tFEWSyjfiZH2Un2qx7rcm78coSbh7"
     val context = LocalContext.current
 
-    // Load initial or searched affiliates
-    LaunchedEffect(searchQuery) {
+    // Load all affiliates
+    LaunchedEffect(Unit) {
         isLoading = true
-        affiliateItems = emptyList()
-        lastDocument = null
-        val db = FirebaseFirestore.getInstance()
-        val query = db.collection("affiliates")
-            .orderBy("createdAt")
-            .limit(25) // CHANGED: Reduced batch size to 25
-        Log.d("AffiliatesScreen", "Fetching initial batch: collection=affiliates, limit=25")
-        val affiliateDocuments = try {
-            query.get().await()
-        } catch (e: Exception) {
-            Log.e("AffiliatesScreen", "Initial fetch error: ${e.message}")
-            isLoading = false
-            return@LaunchedEffect
-        }
-        val affiliates = affiliateDocuments.mapNotNull { doc ->
-            val affiliateId = doc.id
-            val name = doc.getString("name") ?: return@mapNotNull null
-            val logoUrl = doc.getString("logoUrl") ?: ""
-            val cryptoBackOffer = doc.getString("cryptoBackOffer") ?: "Upto 5% Crypto Cashback"
-            val createdAt = doc.get("createdAt")?.toString() ?: "null"
-            Log.d("AffiliatesScreen", "Document: id=$affiliateId, name=$name, createdAt=$createdAt")
-            if (searchQuery.trim().isEmpty() || name.lowercase().contains(searchQuery.trim().lowercase())) {
-                AffiliateItem(affiliateId, name, logoUrl, cryptoBackOffer)
-            } else {
-                null
-            }
-        }
-        affiliateItems = affiliates
-        lastDocument = if (affiliateDocuments.documents.isNotEmpty()) affiliateDocuments.documents.lastOrNull() else null
-        Log.d("AffiliatesScreen", "Initial fetch: loaded=${affiliates.size}, total=${affiliateItems.size}, lastDocument=${lastDocument?.id}")
-        // CHANGED: Fallback query if fewer than expected
-        if (affiliates.size < 25 && lastDocument != null) {
-            Log.d("AffiliatesScreen", "Running fallback query to fetch all affiliates")
-            val fallbackQuery = db.collection("affiliates").get()
-            val fallbackDocs = try {
-                fallbackQuery.await()
-            } catch (e: Exception) {
-                Log.e("AffiliatesScreen", "Fallback fetch error: ${e.message}")
-                isLoading = false
-                return@LaunchedEffect
-            }
-            val fallbackAffiliates = fallbackDocs.mapNotNull { doc ->
-                val affiliateId = doc.id
-                val name = doc.getString("name") ?: return@mapNotNull null
-                val logoUrl = doc.getString("logoUrl") ?: ""
-                val cryptoBackOffer = doc.getString("cryptoBackOffer") ?: "Upto 5% Crypto Cashback"
-                val createdAt = doc.get("createdAt")?.toString() ?: "null"
-                Log.d("AffiliatesScreen", "Fallback document: id=$affiliateId, name=$name, createdAt=$createdAt")
-                if (searchQuery.trim().isEmpty() || name.lowercase().contains(searchQuery.trim().lowercase())) {
+        coroutineScope.launch {
+            val db = FirebaseFirestore.getInstance()
+            val query = db.collection("affiliates")
+                .whereEqualTo("isActive", true)
+                .orderBy("createdAt")
+            Log.d("AffiliatesScreen", "Fetching all affiliates: collection=affiliates, isActive=true")
+            try {
+                val affiliateDocuments = query.get().await()
+                val affiliates = affiliateDocuments.documents.mapNotNull { doc ->
+                    val affiliateId = doc.id
+                    val name = doc.get("name") as? String ?: return@mapNotNull null
+                    val logoUrl = doc.get("logoUrl") as? String ?: ""
+                    val cryptoBackOffer = doc.get("cryptoBackOffer") as? String ?: "Upto 5% Crypto Cashback"
+                    val createdAt = doc.get("createdAt")?.toString() ?: "null"
+                    Log.d("AffiliatesScreen", "Document: id=$affiliateId, name=$name, createdAt=$createdAt")
                     AffiliateItem(affiliateId, name, logoUrl, cryptoBackOffer)
-                } else {
-                    null
                 }
+                affiliateItems = affiliates
+                Log.d("AffiliatesScreen", "Fetch complete: loaded=${affiliates.size}, total=${affiliateItems.size}")
+            } catch (e: Exception) {
+                Log.e("AffiliatesScreen", "Fetch error: ${e.message}")
             }
-            affiliateItems = fallbackAffiliates
-            lastDocument = null // No pagination after fallback
-            Log.d("AffiliatesScreen", "Fallback fetch: loaded=${fallbackAffiliates.size}, total=${affiliateItems.size}")
+            isLoading = false
         }
-        isLoading = false
     }
 
-    // Load more affiliates on scroll
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.layoutInfo }
-            .collect { layoutInfo ->
-                val totalItems = layoutInfo.totalItemsCount
-                val visibleItems = layoutInfo.visibleItemsInfo
-                val lastVisibleIndex = visibleItems.lastOrNull()?.index ?: 0
-                if (!isLoading && lastDocument != null && lastVisibleIndex >= totalItems - 5 && totalItems > 0) {
-                    Log.d("AffiliatesScreen", "Triggering pagination: lastVisibleIndex=$lastVisibleIndex, totalItems=$totalItems, lastDocument=${lastDocument?.id}")
-                    isLoading = true
-                    val db = FirebaseFirestore.getInstance()
-                    val query = db.collection("affiliates")
-                        .orderBy("createdAt")
-                        .startAfter(lastDocument)
-                        .limit(25) // CHANGED: Reduced batch size to 25
-                    Log.d("AffiliatesScreen", "Fetching next batch: collection=affiliates, startAfter=${lastDocument?.id}, limit=25")
-                    val affiliateDocuments = try {
-                        query.get().await()
-                    } catch (e: Exception) {
-                        Log.e("AffiliatesScreen", "Pagination fetch error: ${e.message}")
-                        isLoading = false
-                        return@collect
-                    }
-                    val newAffiliates = affiliateDocuments.mapNotNull { doc ->
-                        val affiliateId = doc.id
-                        val name = doc.getString("name") ?: return@mapNotNull null
-                        val logoUrl = doc.getString("logoUrl") ?: ""
-                        val cryptoBackOffer = doc.getString("cryptoBackOffer") ?: "Upto 5% Crypto Cashback"
-                        val createdAt = doc.get("createdAt")?.toString() ?: "null"
-                        Log.d("AffiliatesScreen", "Document: id=$affiliateId, name=$name, createdAt=$createdAt")
-                        if (searchQuery.trim().isEmpty() || name.lowercase().contains(searchQuery.trim().lowercase())) {
-                            AffiliateItem(affiliateId, name, logoUrl, cryptoBackOffer)
-                        } else {
-                            null
-                        }
-                    }
-                    affiliateItems = affiliateItems + newAffiliates
-                    lastDocument = if (affiliateDocuments.documents.isNotEmpty()) affiliateDocuments.documents.lastOrNull() else null
-                    Log.d("AffiliatesScreen", "Next fetch: loaded=${newAffiliates.size}, total=${affiliateItems.size}, lastDocument=${lastDocument?.id}")
-                    isLoading = false
-                }
-            }
+    // Filter affiliates based on search query
+    val filteredAffiliates = if (searchQuery.trim().isEmpty()) {
+        affiliateItems
+    } else {
+        affiliateItems.filter { it.name.lowercase().contains(searchQuery.trim().lowercase()) }
     }
 
     Scaffold(
@@ -279,7 +205,7 @@ fun AffiliatesScreen(
                             textAlign = TextAlign.Start
                         )
                     }
-                    items(affiliateItems) { affiliate ->
+                    items(filteredAffiliates) { affiliate ->
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -290,7 +216,6 @@ fun AffiliatesScreen(
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .aspectRatio(3f / 2f)
                                     .clickable {
                                         coroutineScope.launch {
                                             // Track click
@@ -310,9 +235,12 @@ fun AffiliatesScreen(
                                         }
                                     }
                             ) {
-                                Box(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.Center
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    verticalArrangement = Arrangement.SpaceBetween,
+                                    horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     if (affiliate.logoUrl.isNotEmpty()) {
                                         AsyncImage(
@@ -330,15 +258,11 @@ fun AffiliatesScreen(
                                             textAlign = TextAlign.Center
                                         )
                                     }
-                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Spacer(modifier = Modifier.height(16.dp))
                                     Text(
                                         text = affiliate.cryptoBackOffer,
                                         style = MaterialTheme.typography.bodyLarge,
                                         color = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier
-                                            .align(Alignment.BottomCenter)
-                                            .padding(horizontal = 16.dp, vertical = 16.dp)
-                                            .fillMaxWidth(),
                                         textAlign = TextAlign.Center,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
