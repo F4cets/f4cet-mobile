@@ -9,16 +9,16 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Face
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.List
-import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -39,7 +39,10 @@ import coil.compose.AsyncImage
 import com.f4cets.mobile.ui.theme.F4cetMobileTheme
 import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FirebaseFirestore
+import java.text.SimpleDateFormat
+import java.util.Locale
 import kotlinx.coroutines.tasks.await
+import androidx.compose.ui.draw.clip
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -56,6 +59,19 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+}
+
+// Helper function to format date
+fun formatDate(timestamp: String?): String {
+    return timestamp?.let {
+        try {
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).parse(it)?.let { date ->
+                SimpleDateFormat("MMM d", Locale.US).format(date)
+            } ?: "Unknown"
+        } catch (e: Exception) {
+            "Unknown" // Fallback if parsing fails
+        }
+    } ?: "Unknown"
 }
 
 @Composable
@@ -101,7 +117,16 @@ data class AffiliateItem(
     val affiliateId: String = "",
     val name: String = "",
     val logoUrl: String = "",
-    val cryptoBackOffer: String = "" // CHANGED: Added cryptoBackOffer
+    val cryptoBackOffer: String = ""
+)
+
+data class OrderCardData(
+    val productName: String,
+    val orderDate: String,
+    val amount: String,
+    val status: String,
+    val imageUrl: String,
+    val transId: String // Added for tracking
 )
 
 @Composable
@@ -114,12 +139,14 @@ fun MainScreen(
     var logoUrls by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var marketplaceItems by remember { mutableStateOf<List<MarketplaceItem>>(emptyList()) }
     var affiliateItems by remember { mutableStateOf<List<AffiliateItem>>(emptyList()) }
+    var orderCards by remember { mutableStateOf<List<OrderCardData>>(emptyList()) }
     var isFabMenuExpanded by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
 
     LaunchedEffect(Unit) {
         val db = FirebaseFirestore.getInstance()
         val walletId = "2FbdM2GpXGPgkt8tFEWSyjfiZH2Un2qx7rcm78coSbh7"
-        
+
         // Fetch affiliate clicks
         val clickDocuments = db.collection("users")
             .document(walletId)
@@ -196,10 +223,44 @@ fun MainScreen(
             val affiliateId = doc.id
             val name = doc.getString("name") ?: return@mapNotNull null
             val logoUrl = doc.getString("logoUrl") ?: ""
-            val cryptoBackOffer = doc.getString("cryptoBackOffer") ?: "" // CHANGED: Fetch cryptoBackOffer
+            val cryptoBackOffer = doc.getString("cryptoBackOffer") ?: ""
             AffiliateItem(affiliateId, name, logoUrl, cryptoBackOffer)
         }
         affiliateItems = affiliates
+
+        // Fetch transactions for order cards
+        val transactionDocs = db.collection("transactions")
+            .whereEqualTo("buyerId", walletId)
+            .whereIn("status", listOf("Ordered", "Shipped", "Delivered"))
+            .get()
+            .await()
+        val orders = transactionDocs.mapNotNull { doc ->
+            val transId = doc.id
+            val amount = doc.getDouble("amount")?.toString() ?: "0"
+            val currency = doc.getString("currency") ?: "SOL"
+            val status = doc.getString("status") ?: "Ordered"
+            val createdAt = doc.getString("createdAt")?.let { formatDate(it) } ?: "Unknown"
+            val productIds = doc.get("productIds") as? List<String> ?: emptyList()
+            if (productIds.isNotEmpty()) {
+                val productId = productIds[0]
+                val productDoc = db.collection("products").document(productId).get().await()
+                val productName = productDoc.getString("name") ?: "Unknown Product"
+                val imageUrl = productDoc.getString("selectedImage") ?: ""
+                val type = productDoc.getString("type") ?: ""
+                if (type == "digital" || type == "rwi") {
+                    OrderCardData(productName, createdAt, "$amount $currency", status, imageUrl, transId)
+                } else {
+                    null
+                }
+            } else {
+                null
+            }
+        }
+        orderCards = orders
+    }
+
+    LaunchedEffect(orderCards) {
+        listState.animateScrollToItem(0)
     }
 
     Scaffold(
@@ -221,7 +282,7 @@ fun MainScreen(
                     color = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(top = 16.dp, start = 16.dp)
+                        .padding(top = 24.dp, start = 24.dp)
                         .size(56.dp)
                 ) {
                     Box(
@@ -252,61 +313,53 @@ fun MainScreen(
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(top = 16.dp, end = 16.dp)
+                        .padding(top = 24.dp, end = 24.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.ShoppingCart,
                         contentDescription = "Shopping Cart"
                     )
                 }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 120.dp, start = 16.dp, end = 16.dp)
-                        .height(56.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = "",
-                        onValueChange = { /* Handle search input */ },
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 8.dp),
-                        placeholder = { Text("Search") },
-                        singleLine = true,
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            focusedIndicatorColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            unfocusedIndicatorColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        ),
-                        shape = RoundedCornerShape(28.dp)
-                    )
-                    Surface(
-                        color = MaterialTheme.colorScheme.primary,
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.size(56.dp)
-                    ) {
-                        IconButton(
-                            onClick = { /* Handle filter action */ }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.List,
-                                contentDescription = "Filter List",
-                                tint = MaterialTheme.colorScheme.onPrimary
-                            )
-                        }
-                    }
-                }
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(top = 192.dp, start = 16.dp, end = 16.dp)
+                        .padding(top = 120.dp, start = 16.dp, end = 16.dp)
                 ) {
+                    item {
+                        if (orderCards.isNotEmpty()) {
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(orderCards) { orderCard ->
+                                    OrderCard(
+                                        productName = orderCard.productName,
+                                        orderDate = orderCard.orderDate,
+                                        amount = orderCard.amount,
+                                        status = orderCard.status,
+                                        imageUrl = orderCard.imageUrl
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Orders",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
+                                color = Color(0xFF727272),
+                                textDecoration = null,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 8.dp),
+                                textAlign = TextAlign.Start
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
+                    }
                     item {
                         LazyRow(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             val clickCount = affiliateClicks.size
                             if (clickCount == 0) {
@@ -314,7 +367,7 @@ fun MainScreen(
                                     ElevatedCard(
                                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                                         modifier = Modifier
-                                            .size(width = 200.dp, height = 140.dp)
+                                            .size(width = 240.dp, height = 140.dp)
                                     ) {
                                         Box(
                                             modifier = Modifier.fillMaxSize(),
@@ -335,7 +388,7 @@ fun MainScreen(
                                     ElevatedCard(
                                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                                         modifier = Modifier
-                                            .size(width = 230.dp, height = 140.dp)
+                                            .size(width = 240.dp, height = 140.dp)
                                     ) {
                                         Box(
                                             modifier = Modifier.fillMaxSize(),
@@ -366,13 +419,13 @@ fun MainScreen(
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = "Recent",
-                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Medium),
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
                             color = Color(0xFF727272),
                             textDecoration = null,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(end = 6.dp),
-                            textAlign = TextAlign.End
+                            textAlign = TextAlign.Start
                         )
                     }
                     item {
@@ -381,7 +434,7 @@ fun MainScreen(
                     item {
                         LazyRow(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             items(marketplaceItems) { product ->
                                 ElevatedCard(
@@ -409,13 +462,13 @@ fun MainScreen(
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = "Marketplace",
-                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Medium),
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
                             color = Color(0xFF727272),
                             textDecoration = null,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(end = 6.dp),
-                            textAlign = TextAlign.End
+                            textAlign = TextAlign.Start
                         )
                     }
                     item {
@@ -424,7 +477,7 @@ fun MainScreen(
                     item {
                         LazyRow(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             items(affiliateItems) { affiliate ->
                                 ElevatedCard(
@@ -460,20 +513,20 @@ fun MainScreen(
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = "Affiliates",
-                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Medium),
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
                             color = Color(0xFF727272),
                             textDecoration = null,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(end = 6.dp),
-                            textAlign = TextAlign.End
+                            textAlign = TextAlign.Start
                         )
                     }
                     item {
                         Spacer(modifier = Modifier.height(16.dp))
                     }
                     item {
-                        Spacer(modifier = Modifier.height(100.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
                 }
                 Box(
@@ -483,49 +536,77 @@ fun MainScreen(
                 ) {
                     Column(
                         horizontalAlignment = Alignment.End,
-                        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         // Secondary FABs (shown when expanded)
                         val scale by animateFloatAsState(if (isFabMenuExpanded) 1f else 0f)
                         if (isFabMenuExpanded) {
-                            FloatingActionButton(
-                                onClick = { /* Placeholder for Receipt action */ },
-                                containerColor = MaterialTheme.colorScheme.secondary,
-                                contentColor = MaterialTheme.colorScheme.onSecondary,
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .scale(scale)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Face,
-                                    contentDescription = "Receipt"
-                                )
-                            }
+                            // CHANGED: Reordered FABs, added text, updated icons
                             FloatingActionButton(
                                 onClick = { navigateToAffiliates() },
                                 containerColor = MaterialTheme.colorScheme.secondary,
                                 contentColor = MaterialTheme.colorScheme.onSecondary,
                                 modifier = Modifier
-                                    .size(48.dp)
+                                    .size(width = 120.dp, height = 48.dp)
                                     .scale(scale)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Search,
-                                    contentDescription = "Search"
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Star,
+                                        contentDescription = "Affiliates"
+                                    )
+                                    Text(
+                                        text = "Affiliates",
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+                                }
                             }
                             FloatingActionButton(
-                                onClick = { /* Placeholder for Home action */ },
+                                onClick = { /* Placeholder for Marketplace action */ },
                                 containerColor = MaterialTheme.colorScheme.secondary,
                                 contentColor = MaterialTheme.colorScheme.onSecondary,
                                 modifier = Modifier
-                                    .size(48.dp)
+                                    .size(width = 120.dp, height = 48.dp)
                                     .scale(scale)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Home,
-                                    contentDescription = "Home"
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Favorite,
+                                        contentDescription = "Marketplace"
+                                    )
+                                    Text(
+                                        text = "Marketplace",
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+                                }
+                            }
+                            FloatingActionButton(
+                                onClick = { /* Placeholder for Profile action */ },
+                                containerColor = MaterialTheme.colorScheme.secondary,
+                                contentColor = MaterialTheme.colorScheme.onSecondary,
+                                modifier = Modifier
+                                    .size(width = 120.dp, height = 48.dp)
+                                    .scale(scale)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Face,
+                                        contentDescription = "Profile"
+                                    )
+                                    Text(
+                                        text = "Profile",
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+                                }
                             }
                         }
                         // Primary FAB
@@ -544,6 +625,97 @@ fun MainScreen(
                 }
             }
         }
+    )
+}
+
+@Composable
+fun OrderCard(
+    productName: String,
+    orderDate: String,
+    amount: String,
+    status: String,
+    imageUrl: String
+) {
+    ElevatedCard(
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White,
+            contentColor = MaterialTheme.colorScheme.onSurface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+        modifier = Modifier
+            .size(width = 320.dp, height = 120.dp)
+            .padding(horizontal = 4.dp),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Left Side: Text Details
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 16.dp, end = 8.dp)
+            ) {
+                Text(
+                    text = productName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Ordered $orderDate",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Text(
+                    text = amount,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    text = status,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = when (status) {
+                        "Ordered" -> MaterialTheme.colorScheme.primary
+                        "Shipped" -> MaterialTheme.colorScheme.tertiary
+                        "Delivered" -> MaterialTheme.colorScheme.secondary
+                        else -> MaterialTheme.colorScheme.onSurface
+                    }
+                )
+            }
+            // Right Side: Image with rounded corners
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = "Order Item Image",
+                modifier = Modifier
+                    .size(100.dp)
+                    .padding(end = 16.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+                contentScale = ContentScale.Crop,
+                error = painterResource(id = R.drawable.bgf)
+            )
+        }
+    }
+}
+
+// Placeholder function to simulate Firestore data (replace with real fetch later)
+@Composable
+fun getOrderCards(): List<OrderCardData> {
+    return listOf(
+        OrderCardData(
+            productName = "Rockstar Original",
+            orderDate = "Jun 4",
+            amount = "2 items - $26.98",
+            status = "Ordered",
+            imageUrl = "https://via.placeholder.com/100",
+            transId = "trans1-uuid"
+        ),
+        OrderCardData(
+            productName = "Lucky",
+            orderDate = "Jun 5",
+            amount = "1 item - 0.006 SOL",
+            status = "Shipped",
+            imageUrl = "https://via.placeholder.com/100",
+            transId = "trans2-uuid"
+        )
     )
 }
 

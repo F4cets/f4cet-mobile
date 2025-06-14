@@ -7,18 +7,21 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells // CHANGED: Kept for LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.GridItemSpan // CHANGED: Added for proper span
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid // CHANGED: Kept for grid layout
+import androidx.compose.foundation.lazy.grid.items // CHANGED: Kept for grid items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState // CHANGED: Kept for grid state
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Face
+import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.List
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -49,16 +52,15 @@ fun AffiliatesScreen(
 ) {
     var affiliateItems by remember { mutableStateOf<List<AffiliateItem>>(emptyList()) }
     var searchQuery by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf("") } // CHANGED: Added for category filtering
-    var isCategoryMenuExpanded by remember { mutableStateOf(false) } // CHANGED: For dropdown menu
+    var selectedCategory by remember { mutableStateOf("") }
+    var isCategoryMenuExpanded by remember { mutableStateOf(false) }
     var isFabMenuExpanded by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
-    val listState = rememberLazyListState()
+    val listState = rememberLazyGridState() // CHANGED: Changed to LazyGridState
     val coroutineScope = rememberCoroutineScope()
     val walletId = "2FbdM2GpXGPgkt8tFEWSyjfiZH2Un2qx7rcm78coSbh7"
     val context = LocalContext.current
 
-    // CHANGED: Define categories list
     val categories = listOf(
         "Accessories",
         "Art & Collectibles",
@@ -86,8 +88,7 @@ fun AffiliatesScreen(
         "Toys & Games"
     )
 
-    // Load affiliates
-    LaunchedEffect(selectedCategory) { // CHANGED: Trigger on category change
+    LaunchedEffect(selectedCategory) {
         isLoading = true
         coroutineScope.launch {
             val db = FirebaseFirestore.getInstance()
@@ -119,7 +120,6 @@ fun AffiliatesScreen(
         }
     }
 
-    // Filter affiliates based on search query
     val filteredAffiliates = if (searchQuery.trim().isEmpty()) {
         affiliateItems
     } else {
@@ -145,7 +145,7 @@ fun AffiliatesScreen(
                     color = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(top = 16.dp, start = 16.dp)
+                        .padding(top = 24.dp, start = 24.dp)
                         .size(56.dp)
                 ) {
                     Box(
@@ -176,7 +176,7 @@ fun AffiliatesScreen(
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(top = 16.dp, end = 16.dp)
+                        .padding(top = 24.dp, end = 24.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.ShoppingCart,
@@ -206,7 +206,7 @@ fun AffiliatesScreen(
                         ),
                         shape = RoundedCornerShape(28.dp)
                     )
-                    Box { // CHANGED: Wrap IconButton in Box for DropDownMenu
+                    Box {
                         Surface(
                             color = MaterialTheme.colorScheme.primary,
                             shape = RoundedCornerShape(16.dp),
@@ -229,12 +229,20 @@ fun AffiliatesScreen(
                                 .width(200.dp)
                                 .heightIn(max = 400.dp)
                         ) {
-                            // CHANGED: Add "All" option
                             DropdownMenuItem(
                                 text = { Text("All") },
                                 onClick = {
                                     selectedCategory = ""
                                     isCategoryMenuExpanded = false
+                                },
+                                trailingIcon = {
+                                    if (selectedCategory.isEmpty()) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Check,
+                                            contentDescription = "Selected",
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
                                 }
                             )
                             categories.forEach { category ->
@@ -243,19 +251,33 @@ fun AffiliatesScreen(
                                     onClick = {
                                         selectedCategory = category
                                         isCategoryMenuExpanded = false
+                                    },
+                                    trailingIcon = {
+                                        if (selectedCategory == category) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Check,
+                                                contentDescription = "Selected",
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
                                     }
                                 )
                             }
                         }
                     }
                 }
-                LazyColumn(
+                // CHANGED: Replaced LazyColumn with LazyVerticalGrid
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3), // CHANGED: Set 3 columns
                     state = listState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(top = 192.dp, start = 16.dp, end = 16.dp)
+                        .padding(top = 192.dp, start = 16.dp, end = 16.dp),
+                    contentPadding = PaddingValues(bottom = 80.dp), // CHANGED: Added padding for FAB
+                    horizontalArrangement = Arrangement.spacedBy(8.dp), // CHANGED: Space between columns
+                    verticalArrangement = Arrangement.spacedBy(8.dp) // CHANGED: Space between rows
                 ) {
-                    item {
+                    item(span = { GridItemSpan(3) }) { // CHANGED: Use GridItemSpan(3) for full-width header
                         Text(
                             text = "Affiliate Stores",
                             style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Medium),
@@ -270,8 +292,7 @@ fun AffiliatesScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(bottom = 16.dp)
-                                .widthIn(min = 200.dp, max = 300.dp)
+                                .padding(bottom = 8.dp) // CHANGED: Adjusted padding
                         ) {
                             ElevatedCard(
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -299,7 +320,7 @@ fun AffiliatesScreen(
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(16.dp),
+                                        .padding(8.dp), // CHANGED: Reduced padding for compact cards
                                     verticalArrangement = Arrangement.SpaceBetween,
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
@@ -309,7 +330,7 @@ fun AffiliatesScreen(
                                             contentDescription = "Affiliate Logo for ${affiliate.name}",
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .aspectRatio(3f / 2f),
+                                                .aspectRatio(1f), // CHANGED: Square aspect ratio for grid
                                             contentScale = ContentScale.Fit
                                         )
                                     } else {
@@ -319,13 +340,13 @@ fun AffiliatesScreen(
                                             textAlign = TextAlign.Center
                                         )
                                     }
-                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Spacer(modifier = Modifier.height(8.dp)) // CHANGED: Reduced spacer height
                                     Text(
                                         text = affiliate.cryptoBackOffer,
-                                        style = MaterialTheme.typography.bodyLarge,
+                                        style = MaterialTheme.typography.bodySmall, // CHANGED: Smaller text for grid
                                         color = MaterialTheme.colorScheme.onSurface,
                                         textAlign = TextAlign.Center,
-                                        maxLines = 1,
+                                        maxLines = 2, // CHANGED: Allow 2 lines for text
                                         overflow = TextOverflow.Ellipsis
                                     )
                                 }
@@ -333,7 +354,7 @@ fun AffiliatesScreen(
                         }
                     }
                     if (isLoading) {
-                        item {
+                        item(span = { GridItemSpan(3) }) { // CHANGED: Use GridItemSpan(3) for full-width loading indicator
                             CircularProgressIndicator(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -355,43 +376,70 @@ fun AffiliatesScreen(
                         val scale by animateFloatAsState(if (isFabMenuExpanded) 1f else 0f)
                         if (isFabMenuExpanded) {
                             FloatingActionButton(
-                                onClick = { /* Placeholder for Receipt action */ },
-                                containerColor = MaterialTheme.colorScheme.secondary,
-                                contentColor = MaterialTheme.colorScheme.onSecondary,
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .scale(scale)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Face,
-                                    contentDescription = "Receipt"
-                                )
-                            }
-                            FloatingActionButton(
-                                onClick = { /* Placeholder for Search action */ },
-                                containerColor = MaterialTheme.colorScheme.secondary,
-                                contentColor = MaterialTheme.colorScheme.onSecondary,
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .scale(scale)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Search,
-                                    contentDescription = "Search"
-                                )
-                            }
-                            FloatingActionButton(
                                 onClick = { navigateBack() },
                                 containerColor = MaterialTheme.colorScheme.secondary,
                                 contentColor = MaterialTheme.colorScheme.onSecondary,
                                 modifier = Modifier
-                                    .size(48.dp)
+                                    .size(width = 120.dp, height = 48.dp)
                                     .scale(scale)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Home,
-                                    contentDescription = "Home"
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Home,
+                                        contentDescription = "Home"
+                                    )
+                                    Text(
+                                        text = "Home",
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+                                }
+                            }
+                            FloatingActionButton(
+                                onClick = { /* Placeholder for Marketplace action */ },
+                                containerColor = MaterialTheme.colorScheme.secondary,
+                                contentColor = MaterialTheme.colorScheme.onSecondary,
+                                modifier = Modifier
+                                    .size(width = 120.dp, height = 48.dp)
+                                    .scale(scale)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Favorite,
+                                        contentDescription = "Marketplace"
+                                    )
+                                    Text(
+                                        text = "Marketplace",
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+                                }
+                            }
+                            FloatingActionButton(
+                                onClick = { /* Placeholder for Profile action */ },
+                                containerColor = MaterialTheme.colorScheme.secondary,
+                                contentColor = MaterialTheme.colorScheme.onSecondary,
+                                modifier = Modifier
+                                    .size(width = 120.dp, height = 48.dp)
+                                    .scale(scale)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Face,
+                                        contentDescription = "Profile"
+                                    )
+                                    Text(
+                                        text = "Profile",
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+                                }
                             }
                         }
                         FloatingActionButton(
