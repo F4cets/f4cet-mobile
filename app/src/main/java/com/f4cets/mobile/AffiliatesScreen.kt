@@ -49,6 +49,8 @@ fun AffiliatesScreen(
 ) {
     var affiliateItems by remember { mutableStateOf<List<AffiliateItem>>(emptyList()) }
     var searchQuery by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf("") } // CHANGED: Added for category filtering
+    var isCategoryMenuExpanded by remember { mutableStateOf(false) } // CHANGED: For dropdown menu
     var isFabMenuExpanded by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
@@ -56,15 +58,47 @@ fun AffiliatesScreen(
     val walletId = "2FbdM2GpXGPgkt8tFEWSyjfiZH2Un2qx7rcm78coSbh7"
     val context = LocalContext.current
 
-    // Load all affiliates
-    LaunchedEffect(Unit) {
+    // CHANGED: Define categories list
+    val categories = listOf(
+        "Accessories",
+        "Art & Collectibles",
+        "Baby & Toddler",
+        "Beauty",
+        "Books, Movies & Music",
+        "Clothing",
+        "Craft Supplies",
+        "Digital Goods",
+        "Digital Services",
+        "Ebooks",
+        "EGames",
+        "Electronics",
+        "Fitness & Nutrition",
+        "Food & Drinks",
+        "Home & Living",
+        "Jewelry",
+        "Luggage & Bags",
+        "NFTs",
+        "Pet Supplies",
+        "Private Access Groups",
+        "Shoes",
+        "Software",
+        "Sporting Goods",
+        "Toys & Games"
+    )
+
+    // Load affiliates
+    LaunchedEffect(selectedCategory) { // CHANGED: Trigger on category change
         isLoading = true
         coroutineScope.launch {
             val db = FirebaseFirestore.getInstance()
-            val query = db.collection("affiliates")
+            var query = db.collection("affiliates")
                 .whereEqualTo("isActive", true)
                 .orderBy("createdAt")
-            Log.d("AffiliatesScreen", "Fetching all affiliates: collection=affiliates, isActive=true")
+            if (selectedCategory.isNotEmpty()) {
+                query = query.whereArrayContains("categories", selectedCategory)
+                Log.d("AffiliatesScreen", "Filtering by category: $selectedCategory")
+            }
+            Log.d("AffiliatesScreen", "Fetching affiliates: collection=affiliates, isActive=true, category=${selectedCategory.ifEmpty { "all" }}")
             try {
                 val affiliateDocuments = query.get().await()
                 val affiliates = affiliateDocuments.documents.mapNotNull { doc ->
@@ -172,19 +206,46 @@ fun AffiliatesScreen(
                         ),
                         shape = RoundedCornerShape(28.dp)
                     )
-                    Surface(
-                        color = MaterialTheme.colorScheme.primary,
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.size(56.dp)
-                    ) {
-                        IconButton(
-                            onClick = { /* Handle filter action */ }
+                    Box { // CHANGED: Wrap IconButton in Box for DropDownMenu
+                        Surface(
+                            color = MaterialTheme.colorScheme.primary,
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.size(56.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Outlined.List,
-                                contentDescription = "Filter List",
-                                tint = MaterialTheme.colorScheme.onPrimary
+                            IconButton(
+                                onClick = { isCategoryMenuExpanded = true }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.List,
+                                    contentDescription = "Filter by Category",
+                                    tint = MaterialTheme.colorScheme.onPrimary
+                                )
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = isCategoryMenuExpanded,
+                            onDismissRequest = { isCategoryMenuExpanded = false },
+                            modifier = Modifier
+                                .width(200.dp)
+                                .heightIn(max = 400.dp)
+                        ) {
+                            // CHANGED: Add "All" option
+                            DropdownMenuItem(
+                                text = { Text("All") },
+                                onClick = {
+                                    selectedCategory = ""
+                                    isCategoryMenuExpanded = false
+                                }
                             )
+                            categories.forEach { category ->
+                                DropdownMenuItem(
+                                    text = { Text(category) },
+                                    onClick = {
+                                        selectedCategory = category
+                                        isCategoryMenuExpanded = false
+                                    }
+                                )
+                            }
                         }
                     }
                 }
