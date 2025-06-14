@@ -7,11 +7,11 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells // CHANGED: Kept for LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.GridItemSpan // CHANGED: Added for proper span
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid // CHANGED: Kept for grid layout
-import androidx.compose.foundation.lazy.grid.items // CHANGED: Kept for grid items
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState // CHANGED: Kept for grid state
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -48,7 +48,8 @@ import java.time.Instant
 @Composable
 fun AffiliatesScreen(
     userProfile: User.Profile?,
-    navigateBack: () -> Unit
+    navigateBack: () -> Unit,
+    navigateToMarketplace: () -> Unit
 ) {
     var affiliateItems by remember { mutableStateOf<List<AffiliateItem>>(emptyList()) }
     var searchQuery by remember { mutableStateOf("") }
@@ -56,36 +57,17 @@ fun AffiliatesScreen(
     var isCategoryMenuExpanded by remember { mutableStateOf(false) }
     var isFabMenuExpanded by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
-    val listState = rememberLazyGridState() // CHANGED: Changed to LazyGridState
+    val listState = rememberLazyGridState()
     val coroutineScope = rememberCoroutineScope()
     val walletId = "2FbdM2GpXGPgkt8tFEWSyjfiZH2Un2qx7rcm78coSbh7"
     val context = LocalContext.current
 
     val categories = listOf(
-        "Accessories",
-        "Art & Collectibles",
-        "Baby & Toddler",
-        "Beauty",
-        "Books, Movies & Music",
-        "Clothing",
-        "Craft Supplies",
-        "Digital Goods",
-        "Digital Services",
-        "Ebooks",
-        "EGames",
-        "Electronics",
-        "Fitness & Nutrition",
-        "Food & Drinks",
-        "Home & Living",
-        "Jewelry",
-        "Luggage & Bags",
-        "NFTs",
-        "Pet Supplies",
-        "Private Access Groups",
-        "Shoes",
-        "Software",
-        "Sporting Goods",
-        "Toys & Games"
+        "Accessories", "Art & Collectibles", "Baby & Toddler", "Beauty", "Books, Movies & Music",
+        "Clothing", "Craft Supplies", "Digital Goods", "Digital Services", "Ebooks", "EGames",
+        "Electronics", "Fitness & Nutrition", "Food & Drinks", "Home & Living", "Jewelry",
+        "Luggage & Bags", "NFTs", "Pet Supplies", "Private Access Groups", "Shoes", "Software",
+        "Sporting Goods", "Toys & Games"
     )
 
     LaunchedEffect(selectedCategory) {
@@ -186,31 +168,17 @@ fun AffiliatesScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 120.dp, start = 16.dp, end = 16.dp)
+                        .padding(top = 120.dp, start = 16.dp, end = 24.dp)
                         .height(56.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 8.dp),
-                        placeholder = { Text("Search Affiliates") },
-                        singleLine = true,
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            focusedIndicatorColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            unfocusedIndicatorColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        ),
-                        shape = RoundedCornerShape(28.dp)
-                    )
                     Box {
                         Surface(
                             color = MaterialTheme.colorScheme.primary,
                             shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.size(56.dp)
+                            modifier = Modifier
+                                .size(56.dp)
+                                .padding(end = 8.dp)
                         ) {
                             IconButton(
                                 onClick = { isCategoryMenuExpanded = true }
@@ -265,34 +233,38 @@ fun AffiliatesScreen(
                             }
                         }
                     }
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier
+                            .weight(0.8f)
+                            .fillMaxHeight(),
+                        placeholder = { Text("Search Affiliates") },
+                        singleLine = true,
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            focusedIndicatorColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            unfocusedIndicatorColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
+                        shape = RoundedCornerShape(28.dp)
+                    )
                 }
-                // CHANGED: Replaced LazyColumn with LazyVerticalGrid
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(3), // CHANGED: Set 3 columns
+                    columns = GridCells.Fixed(3),
                     state = listState,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(top = 192.dp, start = 16.dp, end = 16.dp),
-                    contentPadding = PaddingValues(bottom = 80.dp), // CHANGED: Added padding for FAB
-                    horizontalArrangement = Arrangement.spacedBy(8.dp), // CHANGED: Space between columns
-                    verticalArrangement = Arrangement.spacedBy(8.dp) // CHANGED: Space between rows
+                    contentPadding = PaddingValues(bottom = 80.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    item(span = { GridItemSpan(3) }) { // CHANGED: Use GridItemSpan(3) for full-width header
-                        Text(
-                            text = "Affiliate Stores",
-                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Medium),
-                            color = Color(0xFF727272),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 16.dp),
-                            textAlign = TextAlign.Start
-                        )
-                    }
                     items(filteredAffiliates) { affiliate ->
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(bottom = 8.dp) // CHANGED: Adjusted padding
+                                .padding(bottom = 8.dp)
                         ) {
                             ElevatedCard(
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -300,7 +272,6 @@ fun AffiliatesScreen(
                                     .fillMaxWidth()
                                     .clickable {
                                         coroutineScope.launch {
-                                            // Track click
                                             val db = FirebaseFirestore.getInstance()
                                             db.collection("users")
                                                 .document(walletId)
@@ -311,7 +282,6 @@ fun AffiliatesScreen(
                                                         "timestamp" to Instant.now().toString()
                                                     )
                                                 ).await()
-                                            // Open link (placeholder)
                                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.example.com"))
                                             context.startActivity(intent)
                                         }
@@ -320,7 +290,7 @@ fun AffiliatesScreen(
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(8.dp), // CHANGED: Reduced padding for compact cards
+                                        .padding(8.dp),
                                     verticalArrangement = Arrangement.SpaceBetween,
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
@@ -330,7 +300,7 @@ fun AffiliatesScreen(
                                             contentDescription = "Affiliate Logo for ${affiliate.name}",
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .aspectRatio(1f), // CHANGED: Square aspect ratio for grid
+                                                .aspectRatio(1f),
                                             contentScale = ContentScale.Fit
                                         )
                                     } else {
@@ -340,13 +310,13 @@ fun AffiliatesScreen(
                                             textAlign = TextAlign.Center
                                         )
                                     }
-                                    Spacer(modifier = Modifier.height(8.dp)) // CHANGED: Reduced spacer height
+                                    Spacer(modifier = Modifier.height(8.dp))
                                     Text(
                                         text = affiliate.cryptoBackOffer,
-                                        style = MaterialTheme.typography.bodySmall, // CHANGED: Smaller text for grid
+                                        style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         textAlign = TextAlign.Center,
-                                        maxLines = 2, // CHANGED: Allow 2 lines for text
+                                        maxLines = 2,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                 }
@@ -354,7 +324,7 @@ fun AffiliatesScreen(
                         }
                     }
                     if (isLoading) {
-                        item(span = { GridItemSpan(3) }) { // CHANGED: Use GridItemSpan(3) for full-width loading indicator
+                        item(span = { GridItemSpan(3) }) {
                             CircularProgressIndicator(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -367,7 +337,7 @@ fun AffiliatesScreen(
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(bottom = 16.dp, end = 16.dp)
+                        .padding(bottom = 16.dp, end = 24.dp)
                 ) {
                     Column(
                         horizontalAlignment = Alignment.End,
@@ -398,7 +368,7 @@ fun AffiliatesScreen(
                                 }
                             }
                             FloatingActionButton(
-                                onClick = { /* Placeholder for Marketplace action */ },
+                                onClick = { navigateToMarketplace() },
                                 containerColor = MaterialTheme.colorScheme.secondary,
                                 contentColor = MaterialTheme.colorScheme.onSecondary,
                                 modifier = Modifier
@@ -466,7 +436,8 @@ fun AffiliatesScreenPreview() {
     F4cetMobileTheme {
         AffiliatesScreen(
             userProfile = User.Profile(name = "Test User", avatar = "", email = "", nfts = emptyList()),
-            navigateBack = {}
+            navigateBack = {},
+            navigateToMarketplace = {}
         )
     }
 }

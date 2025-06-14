@@ -91,13 +91,22 @@ fun AppNavigation() {
             MainScreen(
                 userProfile = userProfile,
                 onUserProfileUpdated = { userProfile = it },
-                navigateToAffiliates = { navController.navigate("affiliatesScreen") }
+                navigateToAffiliates = { navController.navigate("affiliatesScreen") },
+                navigateToMarketplace = { navController.navigate("marketplaceScreen") }
             )
         }
         composable("affiliatesScreen") {
             AffiliatesScreen(
                 userProfile = userProfile,
-                navigateBack = { navController.popBackStack() }
+                navigateBack = { navController.popBackStack() },
+                navigateToMarketplace = { navController.navigate("marketplaceScreen") }
+            )
+        }
+        composable("marketplaceScreen") {
+            MarketplaceScreen(
+                userProfile = userProfile,
+                navigateBack = { navController.popBackStack() },
+                navigateToAffiliates = { navController.navigate("affiliatesScreen") } // CHANGED: Added navigateToAffiliates
             )
         }
     }
@@ -126,14 +135,15 @@ data class OrderCardData(
     val amount: String,
     val status: String,
     val imageUrl: String,
-    val transId: String // Added for tracking
+    val transId: String
 )
 
 @Composable
 fun MainScreen(
     userProfile: User.Profile?,
     onUserProfileUpdated: (User.Profile?) -> Unit,
-    navigateToAffiliates: () -> Unit
+    navigateToAffiliates: () -> Unit,
+    navigateToMarketplace: () -> Unit
 ) {
     var affiliateClicks by remember { mutableStateOf<List<AffiliateClick>>(emptyList()) }
     var logoUrls by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
@@ -538,10 +548,8 @@ fun MainScreen(
                         horizontalAlignment = Alignment.End,
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // Secondary FABs (shown when expanded)
                         val scale by animateFloatAsState(if (isFabMenuExpanded) 1f else 0f)
                         if (isFabMenuExpanded) {
-                            // CHANGED: Reordered FABs, added text, updated icons
                             FloatingActionButton(
                                 onClick = { navigateToAffiliates() },
                                 containerColor = MaterialTheme.colorScheme.secondary,
@@ -565,7 +573,7 @@ fun MainScreen(
                                 }
                             }
                             FloatingActionButton(
-                                onClick = { /* Placeholder for Marketplace action */ },
+                                onClick = { navigateToMarketplace() },
                                 containerColor = MaterialTheme.colorScheme.secondary,
                                 contentColor = MaterialTheme.colorScheme.onSecondary,
                                 modifier = Modifier
@@ -609,7 +617,6 @@ fun MainScreen(
                                 }
                             }
                         }
-                        // Primary FAB
                         FloatingActionButton(
                             onClick = { isFabMenuExpanded = !isFabMenuExpanded },
                             containerColor = MaterialTheme.colorScheme.primary,
@@ -651,7 +658,6 @@ fun OrderCard(
             modifier = Modifier.fillMaxSize(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Left Side: Text Details
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -681,7 +687,6 @@ fun OrderCard(
                     }
                 )
             }
-            // Right Side: Image with rounded corners
             AsyncImage(
                 model = imageUrl,
                 contentDescription = "Order Item Image",
@@ -696,29 +701,6 @@ fun OrderCard(
     }
 }
 
-// Placeholder function to simulate Firestore data (replace with real fetch later)
-@Composable
-fun getOrderCards(): List<OrderCardData> {
-    return listOf(
-        OrderCardData(
-            productName = "Rockstar Original",
-            orderDate = "Jun 4",
-            amount = "2 items - $26.98",
-            status = "Ordered",
-            imageUrl = "https://via.placeholder.com/100",
-            transId = "trans1-uuid"
-        ),
-        OrderCardData(
-            productName = "Lucky",
-            orderDate = "Jun 5",
-            amount = "1 item - 0.006 SOL",
-            status = "Shipped",
-            imageUrl = "https://via.placeholder.com/100",
-            transId = "trans2-uuid"
-        )
-    )
-}
-
 @Preview(showBackground = true)
 @Composable
 fun MainScreenPreview() {
@@ -726,7 +708,8 @@ fun MainScreenPreview() {
         MainScreen(
             userProfile = null,
             onUserProfileUpdated = {},
-            navigateToAffiliates = {}
+            navigateToAffiliates = {},
+            navigateToMarketplace = {}
         )
     }
 }
