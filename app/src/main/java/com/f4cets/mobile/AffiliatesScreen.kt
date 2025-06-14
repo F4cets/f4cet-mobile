@@ -2,6 +2,7 @@ package com.f4cets.mobile
 
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -30,9 +31,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.f4cets.mobile.model.AffiliateItem
 import com.f4cets.mobile.ui.theme.F4cetMobileTheme
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
@@ -58,61 +61,106 @@ fun AffiliatesScreen(
     // Load initial or searched affiliates
     LaunchedEffect(searchQuery) {
         isLoading = true
+        affiliateItems = emptyList()
+        lastDocument = null
         val db = FirebaseFirestore.getInstance()
-        val normalizedQuery = searchQuery.trim().lowercase() // Normalize search query
-        val query = if (normalizedQuery.isNotEmpty()) {
-            db.collection("affiliates")
-                .whereGreaterThanOrEqualTo("name", normalizedQuery)
-                .whereLessThanOrEqualTo("name", normalizedQuery + "\uf8ff")
-                .orderBy("name")
-                .limit(30)
-        } else {
-            db.collection("affiliates")
-                .orderBy("createdAt")
-                .limit(30)
+        val query = db.collection("affiliates")
+            .orderBy("createdAt")
+            .limit(25) // CHANGED: Reduced batch size to 25
+        Log.d("AffiliatesScreen", "Fetching initial batch: collection=affiliates, limit=25")
+        val affiliateDocuments = try {
+            query.get().await()
+        } catch (e: Exception) {
+            Log.e("AffiliatesScreen", "Initial fetch error: ${e.message}")
+            isLoading = false
+            return@LaunchedEffect
         }
-        val affiliateDocuments = query.get().await()
         val affiliates = affiliateDocuments.mapNotNull { doc ->
             val affiliateId = doc.id
             val name = doc.getString("name") ?: return@mapNotNull null
             val logoUrl = doc.getString("logoUrl") ?: ""
-            AffiliateItem(affiliateId, name, logoUrl)
+            val cryptoBackOffer = doc.getString("cryptoBackOffer") ?: "Upto 5% Crypto Cashback"
+            val createdAt = doc.get("createdAt")?.toString() ?: "null"
+            Log.d("AffiliatesScreen", "Document: id=$affiliateId, name=$name, createdAt=$createdAt")
+            if (searchQuery.trim().isEmpty() || name.lowercase().contains(searchQuery.trim().lowercase())) {
+                AffiliateItem(affiliateId, name, logoUrl, cryptoBackOffer)
+            } else {
+                null
+            }
         }
-        affiliateItems = affiliates // Update only when results are fetched
-        lastDocument = affiliateDocuments.documents.lastOrNull()
+        affiliateItems = affiliates
+        lastDocument = if (affiliateDocuments.documents.isNotEmpty()) affiliateDocuments.documents.lastOrNull() else null
+        Log.d("AffiliatesScreen", "Initial fetch: loaded=${affiliates.size}, total=${affiliateItems.size}, lastDocument=${lastDocument?.id}")
+        // CHANGED: Fallback query if fewer than expected
+        if (affiliates.size < 25 && lastDocument != null) {
+            Log.d("AffiliatesScreen", "Running fallback query to fetch all affiliates")
+            val fallbackQuery = db.collection("affiliates").get()
+            val fallbackDocs = try {
+                fallbackQuery.await()
+            } catch (e: Exception) {
+                Log.e("AffiliatesScreen", "Fallback fetch error: ${e.message}")
+                isLoading = false
+                return@LaunchedEffect
+            }
+            val fallbackAffiliates = fallbackDocs.mapNotNull { doc ->
+                val affiliateId = doc.id
+                val name = doc.getString("name") ?: return@mapNotNull null
+                val logoUrl = doc.getString("logoUrl") ?: ""
+                val cryptoBackOffer = doc.getString("cryptoBackOffer") ?: "Upto 5% Crypto Cashback"
+                val createdAt = doc.get("createdAt")?.toString() ?: "null"
+                Log.d("AffiliatesScreen", "Fallback document: id=$affiliateId, name=$name, createdAt=$createdAt")
+                if (searchQuery.trim().isEmpty() || name.lowercase().contains(searchQuery.trim().lowercase())) {
+                    AffiliateItem(affiliateId, name, logoUrl, cryptoBackOffer)
+                } else {
+                    null
+                }
+            }
+            affiliateItems = fallbackAffiliates
+            lastDocument = null // No pagination after fallback
+            Log.d("AffiliatesScreen", "Fallback fetch: loaded=${fallbackAffiliates.size}, total=${affiliateItems.size}")
+        }
         isLoading = false
     }
 
     // Load more affiliates on scroll
     LaunchedEffect(listState) {
-        snapshotFlow { listState.firstVisibleItemIndex + listState.layoutInfo.visibleItemsInfo.size }
-            .collect { visibleItemCount ->
-                if (!isLoading && visibleItemCount >= affiliateItems.size - 5 && lastDocument != null) {
+        snapshotFlow { listState.layoutInfo }
+            .collect { layoutInfo ->
+                val totalItems = layoutInfo.totalItemsCount
+                val visibleItems = layoutInfo.visibleItemsInfo
+                val lastVisibleIndex = visibleItems.lastOrNull()?.index ?: 0
+                if (!isLoading && lastDocument != null && lastVisibleIndex >= totalItems - 5 && totalItems > 0) {
+                    Log.d("AffiliatesScreen", "Triggering pagination: lastVisibleIndex=$lastVisibleIndex, totalItems=$totalItems, lastDocument=${lastDocument?.id}")
                     isLoading = true
                     val db = FirebaseFirestore.getInstance()
-                    val normalizedQuery = searchQuery.trim().lowercase()
-                    val query = if (normalizedQuery.isNotEmpty()) {
-                        db.collection("affiliates")
-                            .whereGreaterThanOrEqualTo("name", normalizedQuery)
-                            .whereLessThanOrEqualTo("name", normalizedQuery + "\uf8ff")
-                            .orderBy("name")
-                            .startAfter(lastDocument)
-                            .limit(30)
-                    } else {
-                        db.collection("affiliates")
-                            .orderBy("createdAt")
-                            .startAfter(lastDocument)
-                            .limit(30)
+                    val query = db.collection("affiliates")
+                        .orderBy("createdAt")
+                        .startAfter(lastDocument)
+                        .limit(25) // CHANGED: Reduced batch size to 25
+                    Log.d("AffiliatesScreen", "Fetching next batch: collection=affiliates, startAfter=${lastDocument?.id}, limit=25")
+                    val affiliateDocuments = try {
+                        query.get().await()
+                    } catch (e: Exception) {
+                        Log.e("AffiliatesScreen", "Pagination fetch error: ${e.message}")
+                        isLoading = false
+                        return@collect
                     }
-                    val affiliateDocuments = query.get().await()
                     val newAffiliates = affiliateDocuments.mapNotNull { doc ->
                         val affiliateId = doc.id
                         val name = doc.getString("name") ?: return@mapNotNull null
                         val logoUrl = doc.getString("logoUrl") ?: ""
-                        AffiliateItem(affiliateId, name, logoUrl)
+                        val cryptoBackOffer = doc.getString("cryptoBackOffer") ?: "Upto 5% Crypto Cashback"
+                        val createdAt = doc.get("createdAt")?.toString() ?: "null"
+                        Log.d("AffiliatesScreen", "Document: id=$affiliateId, name=$name, createdAt=$createdAt")
+                        if (searchQuery.trim().isEmpty() || name.lowercase().contains(searchQuery.trim().lowercase())) {
+                            AffiliateItem(affiliateId, name, logoUrl, cryptoBackOffer)
+                        } else {
+                            null
+                        }
                     }
                     affiliateItems = affiliateItems + newAffiliates
-                    lastDocument = affiliateDocuments.documents.lastOrNull()
+                    lastDocument = if (affiliateDocuments.documents.isNotEmpty()) affiliateDocuments.documents.lastOrNull() else null
+                    Log.d("AffiliatesScreen", "Next fetch: loaded=${newAffiliates.size}, total=${affiliateItems.size}, lastDocument=${lastDocument?.id}")
                     isLoading = false
                 }
             }
@@ -242,7 +290,7 @@ fun AffiliatesScreen(
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .aspectRatio(3f / 2f) // CHANGED: 3:2 ratio for 600x400
+                                    .aspectRatio(3f / 2f)
                                     .clickable {
                                         coroutineScope.launch {
                                             // Track click
@@ -270,9 +318,10 @@ fun AffiliatesScreen(
                                         AsyncImage(
                                             model = affiliate.logoUrl,
                                             contentDescription = "Affiliate Logo for ${affiliate.name}",
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentScale = ContentScale.Fit, // CHANGED: Fit to avoid cropping
-                                            error = painterResource(id = R.drawable.bgf)
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .aspectRatio(3f / 2f),
+                                            contentScale = ContentScale.Fit
                                         )
                                     } else {
                                         Text(
@@ -281,15 +330,18 @@ fun AffiliatesScreen(
                                             textAlign = TextAlign.Center
                                         )
                                     }
+                                    Spacer(modifier = Modifier.height(8.dp))
                                     Text(
-                                        text = affiliate.name,
-                                        style = MaterialTheme.typography.bodySmall,
+                                        text = affiliate.cryptoBackOffer,
+                                        style = MaterialTheme.typography.bodyLarge,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         modifier = Modifier
                                             .align(Alignment.BottomCenter)
-                                            .padding(8.dp)
+                                            .padding(horizontal = 16.dp, vertical = 16.dp)
                                             .fillMaxWidth(),
-                                        textAlign = TextAlign.Center
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
@@ -304,9 +356,6 @@ fun AffiliatesScreen(
                                 color = MaterialTheme.colorScheme.primary
                             )
                         }
-                    }
-                    item {
-                        Spacer(modifier = Modifier.height(100.dp))
                     }
                 }
                 Box(
