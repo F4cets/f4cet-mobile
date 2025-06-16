@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.f4cets.mobile.model.Item // CHANGED: Import centralized Item class
 import com.f4cets.mobile.model.MarketplaceItem
 import com.f4cets.mobile.model.StoreItem
 import com.f4cets.mobile.ui.theme.F4cetMobileTheme
@@ -52,7 +53,9 @@ import java.time.Instant
 fun MarketplaceScreen(
     userProfile: User.Profile?,
     navigateBack: () -> Unit,
-    navigateToAffiliates: () -> Unit
+    navigateToAffiliates: () -> Unit,
+    navigateToStore: (String) -> Unit,
+    navigateToProduct: (String) -> Unit
 ) {
     var marketplaceItems by remember { mutableStateOf<List<MarketplaceItem>>(emptyList()) }
     var storeItems by remember { mutableStateOf<List<StoreItem>>(emptyList()) }
@@ -191,12 +194,15 @@ fun MarketplaceScreen(
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
+                // Background image
                 Image(
                     painter = painterResource(id = R.drawable.bgf),
                     contentDescription = "Background Image",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
+
+                // Avatar (top left, same spacing)
                 Surface(
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.secondary,
@@ -227,6 +233,8 @@ fun MarketplaceScreen(
                         }
                     }
                 }
+
+                // Cart button (top right, same spacing)
                 FloatingActionButton(
                     onClick = { /* Placeholder for shopping cart action */ },
                     containerColor = MaterialTheme.colorScheme.primary,
@@ -240,10 +248,12 @@ fun MarketplaceScreen(
                         contentDescription = "Shopping Cart"
                     )
                 }
+
+                // Search bar and filter (unchanged position)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 120.dp, start = 16.dp, end = 24.dp) // CHANGED: Adjusted top=96.dp to 120.dp, end=16.dp to 24.dp
+                        .padding(top = 120.dp, start = 16.dp, end = 24.dp)
                         .height(56.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -279,12 +289,14 @@ fun MarketplaceScreen(
                         shape = RoundedCornerShape(28.dp)
                     )
                 }
+
+                // Product grid (infinite scroll)
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
                     state = listState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(top = 192.dp, start = 16.dp, end = 16.dp), // CHANGED: Adjusted top=168.dp to 192.dp
+                        .padding(top = 192.dp, start = 16.dp, end = 16.dp),
                     contentPadding = PaddingValues(bottom = 80.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -313,8 +325,7 @@ fun MarketplaceScreen(
                                                                 "timestamp" to Instant.now().toString()
                                                             )
                                                         ).await()
-                                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://f4cets.market/sellers/${item.store.sellerId}/ecommerce"))
-                                                    context.startActivity(intent)
+                                                    navigateToStore(item.store.storeId)
                                                 }
                                                 is Item.Product -> {
                                                     db.collection("users")
@@ -326,8 +337,7 @@ fun MarketplaceScreen(
                                                                 "timestamp" to Instant.now().toString()
                                                             )
                                                         ).await()
-                                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://f4cets.market/products/${item.product.productId}"))
-                                                    context.startActivity(intent)
+                                                    navigateToProduct(item.product.productId)
                                                 }
                                             }
                                         }
@@ -435,6 +445,8 @@ fun MarketplaceScreen(
                         }
                     }
                 }
+
+                // FAB menu (bottom right, same spacing)
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
@@ -526,6 +538,7 @@ fun MarketplaceScreen(
                         }
                     }
                 }
+
                 if (isFilterDialogOpen) {
                     AlertDialog(
                         onDismissRequest = { isFilterDialogOpen = false },
@@ -701,11 +714,6 @@ fun MarketplaceScreen(
     )
 }
 
-sealed class Item {
-    data class Store(val store: StoreItem) : Item()
-    data class Product(val product: MarketplaceItem) : Item()
-}
-
 @Preview(showBackground = true)
 @Composable
 fun MarketplaceScreenPreview() {
@@ -713,7 +721,9 @@ fun MarketplaceScreenPreview() {
         MarketplaceScreen(
             userProfile = User.Profile(name = "Test User", avatar = "", email = "", nfts = emptyList()),
             navigateBack = {},
-            navigateToAffiliates = {}
+            navigateToAffiliates = {},
+            navigateToStore = {},
+            navigateToProduct = {}
         )
     }
 }

@@ -23,6 +23,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -32,9 +33,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import coil.compose.AsyncImage
 import com.f4cets.mobile.ui.theme.F4cetMobileTheme
 import com.google.firebase.FirebaseApp
@@ -42,7 +45,6 @@ import com.google.firebase.firestore.FirebaseFirestore
 import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlinx.coroutines.tasks.await
-import androidx.compose.ui.draw.clip
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -69,7 +71,7 @@ fun formatDate(timestamp: String?): String {
                 SimpleDateFormat("MMM d", Locale.US).format(date)
             } ?: "Unknown"
         } catch (e: Exception) {
-            "Unknown" // Fallback if parsing fails
+            "Unknown"
         }
     } ?: "Unknown"
 }
@@ -103,10 +105,36 @@ fun AppNavigation() {
             )
         }
         composable("marketplaceScreen") {
-            MarketplaceScreen(
+            MarketplaceScreen( // CHANGED: Kept MarketplaceScreen for marketplace view
                 userProfile = userProfile,
                 navigateBack = { navController.popBackStack() },
-                navigateToAffiliates = { navController.navigate("affiliatesScreen") } // CHANGED: Added navigateToAffiliates
+                navigateToAffiliates = { navController.navigate("affiliatesScreen") },
+                navigateToStore = { storeId -> navController.navigate("storeScreen/$storeId") },
+                navigateToProduct = { productId -> navController.navigate("productScreen/$productId") }
+            )
+        }
+        composable(
+            "storeScreen/{storeId}",
+            arguments = listOf(navArgument("storeId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            StoreScreen( // CHANGED: Replaced Text with StoreScreen, passing storeId
+                userProfile = userProfile,
+                storeId = backStackEntry.arguments?.getString("storeId") ?: "", // CHANGED: Added storeId
+                navigateBack = { navController.popBackStack() },
+                navigateToAffiliates = { navController.navigate("affiliatesScreen") },
+                navigateToStore = { storeId -> navController.navigate("storeScreen/$storeId") },
+                navigateToProduct = { productId -> navController.navigate("productScreen/$productId") }
+            )
+        }
+        composable(
+            "productScreen/{productId}",
+            arguments = listOf(navArgument("productId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            // Placeholder for ProductScreen
+            Text(
+                text = "Product Screen for ${backStackEntry.arguments?.getString("productId")}",
+                modifier = Modifier.fillMaxSize(),
+                textAlign = TextAlign.Center
             )
         }
     }
