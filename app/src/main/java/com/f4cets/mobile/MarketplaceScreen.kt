@@ -5,6 +5,7 @@ import android.net.Uri
 import android.util.Log
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -39,7 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.f4cets.mobile.model.Item // CHANGED: Import centralized Item class
+import com.f4cets.mobile.model.Item
 import com.f4cets.mobile.model.MarketplaceItem
 import com.f4cets.mobile.model.StoreItem
 import com.f4cets.mobile.ui.theme.F4cetMobileTheme
@@ -692,7 +693,23 @@ fun MarketplaceScreen(
                                     steps = 100,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 16.dp)
+                                        .padding(horizontal = 16.dp),
+                                    startThumb = { // CHANGED: Smaller thumb size
+                                        Box(
+                                            modifier = Modifier
+                                                .size(16.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.primary)
+                                        )
+                                    },
+                                    endThumb = { // CHANGED: Smaller thumb size
+                                        Box(
+                                            modifier = Modifier
+                                                .size(16.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.primary)
+                                        )
+                                    }
                                 )
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),

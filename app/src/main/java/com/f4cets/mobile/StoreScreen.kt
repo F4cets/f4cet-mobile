@@ -5,14 +5,11 @@ import android.net.Uri
 import android.util.Log
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -21,7 +18,6 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Face
 import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.List
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.material3.*
@@ -30,11 +26,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -70,10 +66,10 @@ fun StoreScreen(
     var isFabMenuExpanded by remember { mutableStateOf(false) }
     var isFilterDialogOpen by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
-    val listState = rememberLazyGridState()
     val coroutineScope = rememberCoroutineScope()
     val walletId = "2FbdM2GpXGPgkt8tFEWSyjfiZH2Un2qx7rcm78coSbh7"
     val context = LocalContext.current
+    val listState = rememberLazyListState()
 
     val categories = listOf(
         "Accessories", "Art & Collectibles", "Baby & Toddler", "Beauty", "Books, Movies & Music",
@@ -177,512 +173,204 @@ fun StoreScreen(
                 product.priceUsdc >= priceRangeMin && product.priceUsdc <= priceRangeMax
     }.map { Item.Product(it) }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        content = { innerPadding ->
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-            ) {
-                // Banner image (scrollable with fade)
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                    ) {
-                        val bannerUrl = storeItem?.bannerUrl ?: ""
-                        if (bannerUrl.isNotEmpty()) {
-                            AsyncImage(
-                                model = bannerUrl,
-                                contentDescription = "Store Banner for ${storeItem?.name}",
-                                modifier = Modifier.fillMaxWidth(),
-                                contentScale = ContentScale.Crop,
-                                error = painterResource(id = R.drawable.bgf)
-                            )
-                        } else {
-                            Image(
-                                painter = painterResource(id = R.drawable.bgf),
-                                contentDescription = "Default Banner",
-                                modifier = Modifier.fillMaxWidth(),
-                                contentScale = ContentScale.Crop
-                            )
-                        }
-                        // Fade effect at the bottom
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = Color(0xFFFDFAF0),
+            content = { innerPadding ->
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                ) {
+                    // Banner image with parallax and fade
+                    item {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(40.dp)
-                                .align(Alignment.BottomCenter)
-                                .background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(
-                                            Color.Transparent,
-                                            Color(0xFFFDFAF0) // FFFDFA as requested
-                                        ),
-                                        startY = 0f,
-                                        endY = 40f
-                                    )
-                                )
-                        )
-                    }
-                }
-
-                // Avatar (top-left)
-                item {
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(top = 24.dp, start = 24.dp)
-                            .size(56.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
                         ) {
-                            val avatarUrl = userProfile?.avatar ?: ""
-                            if (avatarUrl.isNotEmpty()) {
+                            val scrollOffset = listState.firstVisibleItemScrollOffset * 0.10f
+                            val bannerUrl = storeItem?.bannerUrl ?: ""
+                            if (bannerUrl.isNotEmpty()) {
                                 AsyncImage(
-                                    model = avatarUrl,
-                                    contentDescription = "User Avatar",
-                                    modifier = Modifier.fillMaxSize(),
+                                    model = bannerUrl,
+                                    contentDescription = "Store Banner for ${storeItem?.name}",
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .offset(y = -scrollOffset.dp)
+                                        .height(300.dp),
                                     contentScale = ContentScale.Crop,
                                     error = painterResource(id = R.drawable.bgf)
                                 )
                             } else {
-                                Text(
-                                    text = userProfile?.name?.take(1) ?: "A",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSecondary
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Shopping Cart FAB (top-right)
-                item {
-                    FloatingActionButton(
-                        onClick = { /* Placeholder for shopping cart action */ },
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(top = 24.dp, end = 24.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.ShoppingCart,
-                            contentDescription = "Shopping Cart"
-                        )
-                    }
-                }
-
-                // Product grid
-                item {
-                    Spacer(modifier = Modifier.height(16.dp)) // Spacing after banner
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        LazyVerticalGrid(
-                            columns = GridCells.Fixed(2),
-                            state = listState,
-                            modifier = Modifier
-                                .fillMaxSize(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(filteredItems) { item ->
-                                Box(
+                                Image(
+                                    painter = painterResource(id = R.drawable.bgf),
+                                    contentDescription = "Default Banner",
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(bottom = 8.dp)
-                                ) {
-                                    ElevatedCard(
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                coroutineScope.launch {
-                                                    val db = FirebaseFirestore.getInstance()
-                                                    when (item) {
-                                                        is Item.Store -> {
-                                                            db.collection("users")
-                                                                .document(walletId)
-                                                                .collection("marketplaceClicks")
-                                                                .add(
-                                                                    mapOf(
-                                                                        "storeId" to item.store.storeId,
-                                                                        "timestamp" to Instant.now().toString()
-                                                                    )
-                                                                ).await()
-                                                            navigateToStore(item.store.storeId)
-                                                        }
-                                                        is Item.Product -> {
-                                                            db.collection("users")
-                                                                .document(walletId)
-                                                                .collection("marketplaceClicks")
-                                                                .add(
-                                                                    mapOf(
-                                                                        "productId" to item.product.productId,
-                                                                        "timestamp" to Instant.now().toString()
-                                                                    )
-                                                                ).await()
-                                                            navigateToProduct(item.product.productId)
-                                                        }
-                                                    }
-                                                }
-                                            },
-                                        shape = RoundedCornerShape(16.dp) // CHANGED: Match image card style
-                                    ) {
-                                        Column(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(8.dp),
-                                            verticalArrangement = Arrangement.SpaceBetween,
-                                            horizontalAlignment = Alignment.CenterHorizontally
-                                        ) {
-                                            when (item) {
-                                                is Item.Store -> {
-                                                    // Skip stores, as this is store-specific
-                                                }
-                                                is Item.Product -> {
-                                                    if (item.product.imageUrl.isNotEmpty()) {
-                                                        AsyncImage(
-                                                            model = item.product.imageUrl,
-                                                            contentDescription = "Product Image for ${item.product.name}",
-                                                            modifier = Modifier
-                                                                .fillMaxWidth()
-                                                                .aspectRatio(1f)
-                                                                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
-                                                            contentScale = ContentScale.Crop
-                                                        )
-                                                    } else {
-                                                        Text(
-                                                            text = item.product.name.take(1),
-                                                            style = MaterialTheme.typography.bodyMedium,
-                                                            textAlign = TextAlign.Center
-                                                        )
-                                                    }
-                                                    Spacer(modifier = Modifier.height(8.dp))
-                                                    Text(
-                                                        text = item.product.name,
-                                                        style = MaterialTheme.typography.bodyMedium,
-                                                        color = MaterialTheme.colorScheme.onSurface,
-                                                        textAlign = TextAlign.Center,
-                                                        maxLines = 1,
-                                                        overflow = TextOverflow.Ellipsis
-                                                    )
-                                                    Text(
-                                                        text = item.product.description,
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.onSurface,
-                                                        textAlign = TextAlign.Center,
-                                                        maxLines = 2,
-                                                        overflow = TextOverflow.Ellipsis
-                                                    )
-                                                    Text(
-                                                        text = "${item.product.priceUsdc} USDC",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.onSurface,
-                                                        textAlign = TextAlign.Center
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
+                                        .offset(y = -scrollOffset.dp)
+                                        .height(300.dp),
+                                    contentScale = ContentScale.Crop
+                                )
                             }
-                            if (isLoading) {
-                                item(span = { GridItemSpan(2) }) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(16.dp),
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-                // FAB menu (bottom-right and bottom-left)
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.End,
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(bottom = 16.dp, end = 24.dp)
-                    ) {
-                        val scale by animateFloatAsState(if (isFabMenuExpanded) 1f else 0f)
-                        if (isFabMenuExpanded) {
-                            FloatingActionButton(
-                                onClick = { navigateBack() },
-                                containerColor = MaterialTheme.colorScheme.secondary,
-                                contentColor = MaterialTheme.colorScheme.onSecondary,
+                            // Gradient fade from transparent at 60% to #FDFAF0 at 100%
+                            Box(
                                 modifier = Modifier
-                                    .size(width = 120.dp, height = 48.dp)
-                                    .scale(scale)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Home,
-                                        contentDescription = "Home"
+                                    .fillMaxWidth()
+                                    .height(300.dp)
+                                    .align(Alignment.BottomCenter)
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colorStops = arrayOf(
+                                                0f to Color.Transparent,
+                                                1f to Color(0xFFFDFAF0)
+                                            ),
+                                            startY = 300f,
+                                            endY = 600f
+                                        )
                                     )
-                                    Text(
-                                        text = "Home",
-                                        style = MaterialTheme.typography.labelMedium
-                                    )
-                                }
-                            }
-                            FloatingActionButton(
-                                onClick = { navigateToAffiliates() },
-                                containerColor = MaterialTheme.colorScheme.secondary,
-                                contentColor = MaterialTheme.colorScheme.onSecondary,
-                                modifier = Modifier
-                                    .size(width = 120.dp, height = 48.dp)
-                                    .scale(scale)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Favorite,
-                                        contentDescription = "Affiliates"
-                                    )
-                                    Text(
-                                        text = "Affiliates",
-                                        style = MaterialTheme.typography.labelMedium
-                                    )
-                                }
-                            }
-                            FloatingActionButton(
-                                onClick = { /* Placeholder for Profile action */ },
-                                containerColor = MaterialTheme.colorScheme.secondary,
-                                contentColor = MaterialTheme.colorScheme.onSecondary,
-                                modifier = Modifier
-                                    .size(width = 120.dp, height = 48.dp)
-                                    .scale(scale)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Face,
-                                        contentDescription = "Profile"
-                                    )
-                                    Text(
-                                        text = "Profile",
-                                        style = MaterialTheme.typography.labelMedium
-                                    )
-                                }
-                            }
-                        }
-                        FloatingActionButton(
-                            onClick = { isFabMenuExpanded = !isFabMenuExpanded },
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(56.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (isFabMenuExpanded) Icons.Outlined.Close else Icons.Outlined.Add,
-                                contentDescription = if (isFabMenuExpanded) "Close Menu" else "Open Menu"
                             )
                         }
                     }
-                    // Filter/Search FAB (bottom-left)
-                    Column(
-                        horizontalAlignment = Alignment.Start,
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(bottom = 16.dp, start = 24.dp)
-                    ) {
-                        val scale by animateFloatAsState(if (isFabMenuExpanded) 1f else 0f)
-                        if (isFabMenuExpanded) {
-                            FloatingActionButton(
-                                onClick = { isFilterDialogOpen = true },
-                                containerColor = MaterialTheme.colorScheme.secondary,
-                                contentColor = MaterialTheme.colorScheme.onSecondary,
-                                modifier = Modifier
-                                    .size(width = 120.dp, height = 48.dp)
-                                    .scale(scale)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Search,
-                                        contentDescription = "Filter/Search"
-                                    )
-                                    Text(
-                                        text = "Filter/Search",
-                                        style = MaterialTheme.typography.labelMedium
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
 
-                if (isFilterDialogOpen) {
-                    AlertDialog(
-                        onDismissRequest = { isFilterDialogOpen = false },
-                        modifier = Modifier
-                            .fillMaxWidth(0.9f)
-                            .padding(16.dp)
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = MaterialTheme.colorScheme.surface
+                    // Product grid
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                                    .fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                OutlinedTextField(
-                                    value = searchQuery,
-                                    onValueChange = { searchQuery = it },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    placeholder = { Text("Search ${storeItem?.name ?: "Store"}") },
-                                    singleLine = true,
-                                    colors = TextFieldDefaults.colors(
-                                        focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                        unfocusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                        focusedIndicatorColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        unfocusedIndicatorColor = MaterialTheme.colorScheme.onPrimaryContainer
-                                    ),
-                                    shape = RoundedCornerShape(28.dp),
-                                    trailingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Outlined.Search,
-                                            contentDescription = "Search",
-                                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                                        )
-                                    }
-                                )
-                                Text(
-                                    text = "Product Type",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    FilterChip(
-                                        selected = selectedType == "All",
-                                        onClick = { selectedType = "All" },
-                                        label = { Text("All Types") },
-                                        colors = FilterChipDefaults.filterChipColors(
-                                            selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                                        )
-                                    )
-                                    FilterChip(
-                                        selected = selectedType == "RWI",
-                                        onClick = { selectedType = "RWI" },
-                                        label = { Text("RWI") },
-                                        colors = FilterChipDefaults.filterChipColors(
-                                            selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                                        )
-                                    )
-                                    FilterChip(
-                                        selected = selectedType == "Digital",
-                                        onClick = { selectedType = "Digital" },
-                                        label = { Text("Digital") },
-                                        colors = FilterChipDefaults.filterChipColors(
-                                            selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                                        )
-                                    )
-                                }
-                                Text(
-                                    text = "Category",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                ExposedDropdownMenuBox(
-                                    expanded = isCategoryMenuExpanded,
-                                    onExpandedChange = { isCategoryMenuExpanded = !isCategoryMenuExpanded }
-                                ) {
-                                    TextField(
-                                        value = selectedCategory.ifEmpty { "All" },
-                                        onValueChange = {},
-                                        readOnly = true,
-                                        trailingIcon = {
-                                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = isCategoryMenuExpanded)
-                                        },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .menuAnchor()
-                                    )
-                                    ExposedDropdownMenu(
-                                        expanded = isCategoryMenuExpanded,
-                                        onDismissRequest = { isCategoryMenuExpanded = false }
+                                filteredItems.chunked(2).forEach { pair ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        DropdownMenuItem(
-                                            text = { Text("All") },
-                                            onClick = {
-                                                selectedCategory = ""
-                                                isCategoryMenuExpanded = false
-                                            }
-                                        )
-                                        categories.forEach { category ->
-                                            DropdownMenuItem(
-                                                text = { Text(category) },
-                                                onClick = {
-                                                    selectedCategory = category
-                                                    isCategoryMenuExpanded = false
+                                        pair.forEach { item ->
+                                            Box(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .padding(bottom = 8.dp)
+                                            ) {
+                                                ElevatedCard(
+                                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .clickable {
+                                                            coroutineScope.launch {
+                                                                val db = FirebaseFirestore.getInstance()
+                                                                when (item) {
+                                                                    is Item.Store -> {
+                                                                        db.collection("users")
+                                                                            .document(walletId)
+                                                                            .collection("marketplaceClicks")
+                                                                            .add(
+                                                                                mapOf(
+                                                                                    "storeId" to item.store.storeId,
+                                                                                    "timestamp" to Instant.now().toString()
+                                                                                )
+                                                                            ).await()
+                                                                        navigateToStore(item.store.storeId)
+                                                                    }
+                                                                    is Item.Product -> {
+                                                                        db.collection("users")
+                                                                            .document(walletId)
+                                                                            .collection("marketplaceClicks")
+                                                                            .add(
+                                                                                mapOf(
+                                                                                    "productId" to item.product.productId,
+                                                                                    "timestamp" to Instant.now().toString()
+                                                                                )
+                                                                            ).await()
+                                                                        navigateToProduct(item.product.productId)
+                                                                    }
+                                                                }
+                                                            }
+                                                        },
+                                                    shape = RoundedCornerShape(16.dp)
+                                                ) {
+                                                    Column(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(8.dp),
+                                                        verticalArrangement = Arrangement.SpaceBetween,
+                                                        horizontalAlignment = Alignment.CenterHorizontally
+                                                    ) {
+                                                        when (item) {
+                                                            is Item.Store -> {
+                                                                // Skip stores, as this is store-specific
+                                                            }
+                                                            is Item.Product -> {
+                                                                if (item.product.imageUrl.isNotEmpty()) {
+                                                                    AsyncImage(
+                                                                        model = item.product.imageUrl,
+                                                                        contentDescription = "Product Image for ${item.product.name}",
+                                                                        modifier = Modifier
+                                                                            .fillMaxWidth()
+                                                                            .aspectRatio(1f)
+                                                                            .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
+                                                                        contentScale = ContentScale.Crop
+                                                                    )
+                                                                } else {
+                                                                    Text(
+                                                                        text = item.product.name.take(1),
+                                                                        style = MaterialTheme.typography.bodyMedium,
+                                                                        textAlign = TextAlign.Center
+                                                                    )
+                                                                }
+                                                                Spacer(modifier = Modifier.height(8.dp))
+                                                                Text(
+                                                                    text = item.product.name,
+                                                                    style = MaterialTheme.typography.bodyMedium,
+                                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                                    textAlign = TextAlign.Center,
+                                                                    maxLines = 1,
+                                                                    overflow = TextOverflow.Ellipsis
+                                                                )
+                                                                Text(
+                                                                    text = item.product.description,
+                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                                    textAlign = TextAlign.Center,
+                                                                    maxLines = 2,
+                                                                    overflow = TextOverflow.Ellipsis
+                                                                )
+                                                                Text(
+                                                                    text = "${item.product.priceUsdc} USDC",
+                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                                    textAlign = TextAlign.Center
+                                                                )
+                                                            }
+                                                        }
+                                                    }
                                                 }
-                                            )
+                                            }
+                                        }
+                                        // Add empty Box if pair has only one item
+                                        if (pair.size == 1) {
+                                            Box(modifier = Modifier.weight(1f))
                                         }
                                     }
                                 }
-                                Text(
-                                    text = "Price Range: $${priceRangeMin.toInt()} - $${priceRangeMax.toInt()}",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                RangeSlider(
-                                    value = priceRangeMin..priceRangeMax,
-                                    onValueChange = { range ->
-                                        priceRangeMin = range.start
-                                        priceRangeMax = range.endInclusive
-                                    },
-                                    valueRange = 0f..1000f,
-                                    steps = 100,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp)
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.End
-                                ) {
-                                    TextButton(onClick = { isFilterDialogOpen = false }) {
-                                        Text("Cancel")
-                                    }
-                                    TextButton(onClick = { isFilterDialogOpen = false }) {
-                                        Text("Apply")
+                                if (isLoading) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        CircularProgressIndicator(
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
                                     }
                                 }
                             }
@@ -690,8 +378,335 @@ fun StoreScreen(
                     }
                 }
             }
+        )
+
+        // Overlay fixed UI elements
+        // Avatar (top-left)
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.secondary,
+            modifier = Modifier
+                .padding(top = 16.dp, start = 16.dp)
+                .size(56.dp)
+                .align(Alignment.TopStart)
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                val avatarUrl = userProfile?.avatar ?: ""
+                if (avatarUrl.isNotEmpty()) {
+                    AsyncImage(
+                        model = avatarUrl,
+                        contentDescription = "User Avatar",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                        error = painterResource(id = R.drawable.bgf)
+                    )
+                } else {
+                    Text(
+                        text = userProfile?.name?.take(1) ?: "A",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSecondary
+                    )
+                }
+            }
         }
-    )
+
+        // Shopping Cart FAB (top-right)
+        FloatingActionButton(
+            onClick = { /* Placeholder for shopping cart action */ },
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier
+                .padding(top = 16.dp, end = 16.dp)
+                .size(56.dp)
+                .align(Alignment.TopEnd)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.ShoppingCart,
+                contentDescription = "Shopping Cart"
+            )
+        }
+
+        // FAB Menu (bottom-right)
+        Column(
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 16.dp, end = 16.dp)
+        ) {
+            val scale by animateFloatAsState(if (isFabMenuExpanded) 1f else 0f)
+            if (isFabMenuExpanded) {
+                FloatingActionButton(
+                    onClick = { navigateBack() },
+                    containerColor = MaterialTheme.colorScheme.secondary,
+                    contentColor = MaterialTheme.colorScheme.onSecondary,
+                    modifier = Modifier
+                        .size(width = 120.dp, height = 48.dp)
+                        .scale(scale)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Home,
+                            contentDescription = "Home"
+                        )
+                        Text(
+                            text = "Home",
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
+                }
+                FloatingActionButton(
+                    onClick = { navigateToAffiliates() },
+                    containerColor = MaterialTheme.colorScheme.secondary,
+                    contentColor = MaterialTheme.colorScheme.onSecondary,
+                    modifier = Modifier
+                        .size(width = 120.dp, height = 48.dp)
+                        .scale(scale)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Favorite,
+                            contentDescription = "Affiliates"
+                        )
+                        Text(
+                            text = "Affiliates",
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
+                }
+                FloatingActionButton(
+                    onClick = { /* Placeholder for Profile action */ },
+                    containerColor = MaterialTheme.colorScheme.secondary,
+                    contentColor = MaterialTheme.colorScheme.onSecondary,
+                    modifier = Modifier
+                        .size(width = 120.dp, height = 48.dp)
+                        .scale(scale)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Face,
+                            contentDescription = "Profile"
+                        )
+                        Text(
+                            text = "Profile",
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
+                }
+            }
+            FloatingActionButton(
+                onClick = { isFabMenuExpanded = !isFabMenuExpanded },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(56.dp)
+            ) {
+                Icon(
+                    imageVector = if (isFabMenuExpanded) Icons.Outlined.Close else Icons.Outlined.Add,
+                    contentDescription = if (isFabMenuExpanded) "Close Menu" else "Open Menu"
+                )
+            }
+        }
+
+        // Filter/Search FAB
+        FloatingActionButton(
+            onClick = { isFilterDialogOpen = true },
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(bottom = 16.dp, start = 16.dp)
+                .size(56.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Search,
+                contentDescription = "Filter/Search"
+            )
+        }
+
+        // Filter Dialog
+        if (isFilterDialogOpen) {
+            AlertDialog(
+                onDismissRequest = { isFilterDialogOpen = false },
+                modifier = Modifier
+                    .fillMaxWidth(0.9f)
+                    .padding(16.dp)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surface
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = {
+                                Text(
+                                    text = "Search ${storeItem?.name ?: "Store"}",
+                                    style = MaterialTheme.typography.labelSmall // CHANGED: Smaller placeholder font
+                                )
+                            },
+                            singleLine = true,
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                focusedIndicatorColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                unfocusedIndicatorColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            ),
+                            shape = RoundedCornerShape(28.dp),
+                            trailingIcon = {
+                                Icon(
+                                    imageVector = Icons.Outlined.Search,
+                                    contentDescription = "Search",
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        )
+                        Text(
+                            text = "Product Type",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            FilterChip(
+                                selected = selectedType == "All",
+                                onClick = { selectedType = "All" },
+                                label = { Text("All Types") },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                                )
+                            )
+                            FilterChip(
+                                selected = selectedType == "RWI",
+                                onClick = { selectedType = "RWI" },
+                                label = { Text("RWI") },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                                )
+                            )
+                            FilterChip(
+                                selected = selectedType == "Digital",
+                                onClick = { selectedType = "Digital" },
+                                label = { Text("Digital") },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                                )
+                            )
+                        }
+                        Text(
+                            text = "Category",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        ExposedDropdownMenuBox(
+                            expanded = isCategoryMenuExpanded,
+                            onExpandedChange = { isCategoryMenuExpanded = !isCategoryMenuExpanded }
+                        ) {
+                            TextField(
+                                value = selectedCategory.ifEmpty { "All" },
+                                onValueChange = {},
+                                readOnly = true,
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = isCategoryMenuExpanded)
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor()
+                            )
+                            ExposedDropdownMenu(
+                                expanded = isCategoryMenuExpanded,
+                                onDismissRequest = { isCategoryMenuExpanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("All") },
+                                    onClick = {
+                                        selectedCategory = ""
+                                        isCategoryMenuExpanded = false
+                                    }
+                                )
+                                categories.forEach { category ->
+                                    DropdownMenuItem(
+                                        text = { Text(category) },
+                                        onClick = {
+                                            selectedCategory = category
+                                            isCategoryMenuExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        Text(
+                            text = "Price Range: $${priceRangeMin.toInt()} - $${priceRangeMax.toInt()}",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        RangeSlider(
+                            value = priceRangeMin..priceRangeMax,
+                            onValueChange = { range ->
+                                priceRangeMin = range.start
+                                priceRangeMax = range.endInclusive
+                            },
+                            valueRange = 0f..1000f,
+                            steps = 100,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            startThumb = {
+                                Box(
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary)
+                                )
+                            },
+                            endThumb = {
+                                Box(
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary)
+                                )
+                            }
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            TextButton(onClick = { isFilterDialogOpen = false }) {
+                                Text("Cancel")
+                            }
+                            TextButton(onClick = { isFilterDialogOpen = false }) {
+                                Text("Apply")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Preview(showBackground = true)
