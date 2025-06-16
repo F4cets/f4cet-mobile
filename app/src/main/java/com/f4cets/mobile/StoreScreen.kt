@@ -386,7 +386,7 @@ fun StoreScreen(
             shape = CircleShape,
             color = MaterialTheme.colorScheme.secondary,
             modifier = Modifier
-                .padding(top = 16.dp, start = 16.dp)
+                .padding(top = 24.dp, start = 24.dp)
                 .size(56.dp)
                 .align(Alignment.TopStart)
         ) {
@@ -419,7 +419,7 @@ fun StoreScreen(
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
             modifier = Modifier
-                .padding(top = 16.dp, end = 16.dp)
+                .padding(top = 24.dp, end = 24.dp)
                 .size(56.dp)
                 .align(Alignment.TopEnd)
         ) {
@@ -435,7 +435,7 @@ fun StoreScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 16.dp, end = 16.dp)
+                .padding(bottom = 24.dp, end = 24.dp)
         ) {
             val scale by animateFloatAsState(if (isFabMenuExpanded) 1f else 0f)
             if (isFabMenuExpanded) {
@@ -526,7 +526,7 @@ fun StoreScreen(
             contentColor = MaterialTheme.colorScheme.onPrimary,
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(bottom = 16.dp, start = 16.dp)
+                .padding(bottom = 24.dp, start = 24.dp)
                 .size(56.dp)
         ) {
             Icon(

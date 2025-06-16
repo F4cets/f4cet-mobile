@@ -105,7 +105,7 @@ fun AppNavigation() {
             )
         }
         composable("marketplaceScreen") {
-            MarketplaceScreen( // CHANGED: Kept MarketplaceScreen for marketplace view
+            MarketplaceScreen(
                 userProfile = userProfile,
                 navigateBack = { navController.popBackStack() },
                 navigateToAffiliates = { navController.navigate("affiliatesScreen") },
@@ -117,9 +117,9 @@ fun AppNavigation() {
             "storeScreen/{storeId}",
             arguments = listOf(navArgument("storeId") { type = NavType.StringType })
         ) { backStackEntry ->
-            StoreScreen( // CHANGED: Replaced Text with StoreScreen, passing storeId
+            StoreScreen(
                 userProfile = userProfile,
-                storeId = backStackEntry.arguments?.getString("storeId") ?: "", // CHANGED: Added storeId
+                storeId = backStackEntry.arguments?.getString("storeId") ?: "",
                 navigateBack = { navController.popBackStack() },
                 navigateToAffiliates = { navController.navigate("affiliatesScreen") },
                 navigateToStore = { storeId -> navController.navigate("storeScreen/$storeId") },
@@ -130,11 +130,13 @@ fun AppNavigation() {
             "productScreen/{productId}",
             arguments = listOf(navArgument("productId") { type = NavType.StringType })
         ) { backStackEntry ->
-            // Placeholder for ProductScreen
-            Text(
-                text = "Product Screen for ${backStackEntry.arguments?.getString("productId")}",
-                modifier = Modifier.fillMaxSize(),
-                textAlign = TextAlign.Center
+            ProductScreen( // CHANGED: Replaced Text with ProductScreen
+                userProfile = userProfile,
+                productId = backStackEntry.arguments?.getString("productId") ?: "",
+                navigateBack = { navController.popBackStack() },
+                navigateToAffiliates = { navController.navigate("affiliatesScreen") },
+                navigateToStore = { storeId -> navController.navigate("storeScreen/$storeId") },
+                navigateToProduct = { productId -> navController.navigate("productScreen/$productId") }
             )
         }
     }
