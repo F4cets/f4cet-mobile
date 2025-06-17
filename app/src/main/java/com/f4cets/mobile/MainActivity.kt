@@ -130,13 +130,23 @@ fun AppNavigation() {
             "productScreen/{productId}",
             arguments = listOf(navArgument("productId") { type = NavType.StringType })
         ) { backStackEntry ->
-            ProductScreen( // CHANGED: Replaced Text with ProductScreen
+            ProductScreen(
                 userProfile = userProfile,
                 productId = backStackEntry.arguments?.getString("productId") ?: "",
                 navigateBack = { navController.popBackStack() },
                 navigateToAffiliates = { navController.navigate("affiliatesScreen") },
                 navigateToStore = { storeId -> navController.navigate("storeScreen/$storeId") },
-                navigateToProduct = { productId -> navController.navigate("productScreen/$productId") }
+                navigateToProduct = { productId -> navController.navigate("productScreen/$productId") },
+                navigateToCart = { navController.navigate("cartScreen") } // CHANGED: Added navigateToCart
+            )
+        }
+        composable("cartScreen") { // CHANGED: Added placeholder cartScreen route
+            Text(
+                text = "Cart Screen (Placeholder)",
+                style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .wrapContentSize(Alignment.Center)
             )
         }
     }
