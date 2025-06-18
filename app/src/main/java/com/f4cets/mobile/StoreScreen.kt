@@ -3,7 +3,9 @@ package com.f4cets.mobile
 import android.content.Intent
 import android.net.Uri
 import android.util.Log
+import androidx.compose.ui.draw.scale
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,10 +26,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -44,6 +52,29 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.time.Instant
+
+// CHANGED: Custom shape for dynamic banner clip
+class DynamicCurveShape(private val scrollProgress: Float) : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density
+    ): Outline {
+        val path = Path()
+        val width = size.width
+        val height = size.height
+        val curveDepth = 50f * (1f - scrollProgress) // Max 50dp curve, flattens as progress increases
+        path.moveTo(0f, 0f)
+        path.lineTo(0f, height)
+        path.quadraticBezierTo(
+            width / 2f, height + curveDepth * density.density,
+            width, height
+        )
+        path.lineTo(width, 0f)
+        path.close()
+        return Outline.Generic(path)
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,6 +100,7 @@ fun StoreScreen(
     val coroutineScope = rememberCoroutineScope()
     val walletId = "2FbdM2GpXGPgkt8tFEWSyjfiZH2Un2qx7rcm78coSbh7"
     val context = LocalContext.current
+    var bannerOpacity by remember { mutableStateOf(1f) }
     val listState = rememberLazyListState()
 
     val categories = listOf(
@@ -184,13 +216,21 @@ fun StoreScreen(
                         .fillMaxSize()
                         .padding(innerPadding)
                 ) {
-                    // Banner image with parallax and fade
+                    // Banner image with parallax and container transform
                     item {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                         ) {
                             val scrollOffset = listState.firstVisibleItemScrollOffset * 0.10f
+                            val bannerHeight = 280f
+                            val scrollProgress = (listState.firstVisibleItemScrollOffset / bannerHeight).coerceIn(0f, 1f)
+                            val bannerOpacity by animateFloatAsState(
+                                targetValue = 1f - scrollProgress,
+                                animationSpec = tween(durationMillis = 300),
+                                label = "bannerOpacity"
+                            )
+                            // REMOVED: bannerScale animation to disable shrinking
                             val bannerUrl = storeItem?.bannerUrl ?: ""
                             if (bannerUrl.isNotEmpty()) {
                                 AsyncImage(
@@ -199,7 +239,9 @@ fun StoreScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .offset(y = -scrollOffset.dp)
-                                        .height(300.dp),
+                                        .height(bannerHeight.dp)
+                                        .alpha(bannerOpacity)
+                                        .clip(DynamicCurveShape(scrollProgress)),
                                     contentScale = ContentScale.Crop,
                                     error = painterResource(id = R.drawable.bgf)
                                 )
@@ -210,167 +252,159 @@ fun StoreScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .offset(y = -scrollOffset.dp)
-                                        .height(300.dp),
+                                        .height(bannerHeight.dp)
+                                        .alpha(bannerOpacity)
+                                        .clip(DynamicCurveShape(scrollProgress)),
                                     contentScale = ContentScale.Crop
                                 )
                             }
-                            // Gradient fade from transparent at 60% to #FDFAF0 at 100%
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(300.dp)
-                                    .align(Alignment.BottomCenter)
-                                    .background(
-                                        Brush.verticalGradient(
-                                            colorStops = arrayOf(
-                                                0f to Color.Transparent,
-                                                1f to Color(0xFFFDFAF0)
-                                            ),
-                                            startY = 300f,
-                                            endY = 600f
-                                        )
-                                    )
-                            )
                         }
                     }
 
                     // Product grid
                     item {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .offset(y = (-20).dp)
+                                .background(Color(0xFFFDFAF0))
+                                .padding(top = 24.dp)
                         ) {
-                            Column(
+                            Row(
                                 modifier = Modifier
-                                    .fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                filteredItems.chunked(2).forEach { pair ->
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        pair.forEach { item ->
-                                            Box(
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .padding(bottom = 8.dp)
-                                            ) {
-                                                ElevatedCard(
-                                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    filteredItems.chunked(2).forEach { pair ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            pair.forEach { item ->
+                                                Box(
                                                     modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .clickable {
-                                                            coroutineScope.launch {
-                                                                val db = FirebaseFirestore.getInstance()
-                                                                when (item) {
-                                                                    is Item.Store -> {
-                                                                        db.collection("users")
-                                                                            .document(walletId)
-                                                                            .collection("marketplaceClicks")
-                                                                            .add(
-                                                                                mapOf(
-                                                                                    "storeId" to item.store.storeId,
-                                                                                    "timestamp" to Instant.now().toString()
-                                                                                )
-                                                                            ).await()
-                                                                        navigateToStore(item.store.storeId)
-                                                                    }
-                                                                    is Item.Product -> {
-                                                                        db.collection("users")
-                                                                            .document(walletId)
-                                                                            .collection("marketplaceClicks")
-                                                                            .add(
-                                                                                mapOf(
-                                                                                    "productId" to item.product.productId,
-                                                                                    "timestamp" to Instant.now().toString()
-                                                                                )
-                                                                            ).await()
-                                                                        navigateToProduct(item.product.productId)
-                                                                    }
-                                                                }
-                                                            }
-                                                        },
-                                                    shape = RoundedCornerShape(16.dp)
+                                                        .weight(1f)
+                                                        .padding(bottom = 8.dp)
                                                 ) {
-                                                    Column(
+                                                    ElevatedCard(
+                                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                                        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
                                                         modifier = Modifier
                                                             .fillMaxWidth()
-                                                            .padding(8.dp),
-                                                        verticalArrangement = Arrangement.SpaceBetween,
-                                                        horizontalAlignment = Alignment.CenterHorizontally
+                                                            .clickable {
+                                                                coroutineScope.launch {
+                                                                    val db = FirebaseFirestore.getInstance()
+                                                                    when (item) {
+                                                                        is Item.Store -> {
+                                                                            db.collection("users")
+                                                                                .document(walletId)
+                                                                                .collection("marketplaceClicks")
+                                                                                .add(
+                                                                                    mapOf(
+                                                                                        "storeId" to item.store.storeId,
+                                                                                        "timestamp" to Instant.now().toString()
+                                                                                    )
+                                                                                ).await()
+                                                                            navigateToStore(item.store.storeId)
+                                                                        }
+                                                                        is Item.Product -> {
+                                                                            db.collection("users")
+                                                                                .document(walletId)
+                                                                                .collection("marketplaceClicks")
+                                                                                .add(
+                                                                                    mapOf(
+                                                                                        "productId" to item.product.productId,
+                                                                                        "timestamp" to Instant.now().toString()
+                                                                                    )
+                                                                                ).await()
+                                                                            navigateToProduct(item.product.productId)
+                                                                        }
+                                                                    }
+                                                                }
+                                                            },
+                                                        shape = RoundedCornerShape(16.dp)
                                                     ) {
-                                                        when (item) {
-                                                            is Item.Store -> {
-                                                                // Skip stores, as this is store-specific
-                                                            }
-                                                            is Item.Product -> {
-                                                                if (item.product.imageUrl.isNotEmpty()) {
-                                                                    AsyncImage(
-                                                                        model = item.product.imageUrl,
-                                                                        contentDescription = "Product Image for ${item.product.name}",
-                                                                        modifier = Modifier
-                                                                            .fillMaxWidth()
-                                                                            .aspectRatio(1f)
-                                                                            .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
-                                                                        contentScale = ContentScale.Crop
-                                                                    )
-                                                                } else {
+                                                        Column(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .padding(8.dp),
+                                                            verticalArrangement = Arrangement.SpaceBetween,
+                                                            horizontalAlignment = Alignment.CenterHorizontally
+                                                        ) {
+                                                            when (item) {
+                                                                is Item.Store -> {
+                                                                    // Skip stores, as this is store-specific
+                                                                }
+                                                                is Item.Product -> {
+                                                                    if (item.product.imageUrl.isNotEmpty()) {
+                                                                        AsyncImage(
+                                                                            model = item.product.imageUrl,
+                                                                            contentDescription = "Product Image for ${item.product.name}",
+                                                                            modifier = Modifier
+                                                                                .fillMaxWidth()
+                                                                                .aspectRatio(1f)
+                                                                                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
+                                                                            contentScale = ContentScale.Crop
+                                                                        )
+                                                                    } else {
+                                                                        Text(
+                                                                            text = item.product.name.take(1),
+                                                                            style = MaterialTheme.typography.bodyMedium,
+                                                                            textAlign = TextAlign.Center
+                                                                        )
+                                                                    }
+                                                                    Spacer(modifier = Modifier.height(8.dp))
                                                                     Text(
-                                                                        text = item.product.name.take(1),
+                                                                        text = item.product.name,
                                                                         style = MaterialTheme.typography.bodyMedium,
+                                                                        color = MaterialTheme.colorScheme.onSurface,
+                                                                        textAlign = TextAlign.Center,
+                                                                        maxLines = 1,
+                                                                        overflow = TextOverflow.Ellipsis
+                                                                    )
+                                                                    Text(
+                                                                        text = item.product.description,
+                                                                        style = MaterialTheme.typography.bodySmall,
+                                                                        color = MaterialTheme.colorScheme.onSurface,
+                                                                        textAlign = TextAlign.Center,
+                                                                        maxLines = 2,
+                                                                        overflow = TextOverflow.Ellipsis
+                                                                    )
+                                                                    Text(
+                                                                        text = "${item.product.priceUsdc} USDC",
+                                                                        style = MaterialTheme.typography.bodySmall,
+                                                                        color = MaterialTheme.colorScheme.onSurface,
                                                                         textAlign = TextAlign.Center
                                                                     )
                                                                 }
-                                                                Spacer(modifier = Modifier.height(8.dp))
-                                                                Text(
-                                                                    text = item.product.name,
-                                                                    style = MaterialTheme.typography.bodyMedium,
-                                                                    color = MaterialTheme.colorScheme.onSurface,
-                                                                    textAlign = TextAlign.Center,
-                                                                    maxLines = 1,
-                                                                    overflow = TextOverflow.Ellipsis
-                                                                )
-                                                                Text(
-                                                                    text = item.product.description,
-                                                                    style = MaterialTheme.typography.bodySmall,
-                                                                    color = MaterialTheme.colorScheme.onSurface,
-                                                                    textAlign = TextAlign.Center,
-                                                                    maxLines = 2,
-                                                                    overflow = TextOverflow.Ellipsis
-                                                                )
-                                                                Text(
-                                                                    text = "${item.product.priceUsdc} USDC",
-                                                                    style = MaterialTheme.typography.bodySmall,
-                                                                    color = MaterialTheme.colorScheme.onSurface,
-                                                                    textAlign = TextAlign.Center
-                                                                )
                                                             }
                                                         }
                                                     }
                                                 }
                                             }
-                                        }
-                                        // Add empty Box if pair has only one item
-                                        if (pair.size == 1) {
-                                            Box(modifier = Modifier.weight(1f))
+                                            // Add empty Box if pair has only one item
+                                            if (pair.size == 1) {
+                                                Box(modifier = Modifier.weight(1f))
+                                            }
                                         }
                                     }
-                                }
-                                if (isLoading) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(16.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        CircularProgressIndicator(
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
+                                    if (isLoading) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(16.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            CircularProgressIndicator(
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -560,7 +594,7 @@ fun StoreScreen(
                             placeholder = {
                                 Text(
                                     text = "Search ${storeItem?.name ?: "Store"}",
-                                    style = MaterialTheme.typography.labelSmall // CHANGED: Smaller placeholder font
+                                    style = MaterialTheme.typography.labelSmall
                                 )
                             },
                             singleLine = true,
