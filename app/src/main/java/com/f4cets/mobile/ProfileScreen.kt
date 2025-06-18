@@ -13,12 +13,9 @@ import androidx.compose.ui.unit.dp
 import com.f4cets.mobile.ui.theme.F4cetMobileTheme
 
 @Composable
-fun CartScreen(
+fun ProfileScreen(
     userProfile: User.Profile?,
-    navigateBack: () -> Unit,
-    navigateToAffiliates: () -> Unit,
-    navigateToStore: (String) -> Unit,
-    navigateToProduct: (String) -> Unit
+    navigateBack: () -> Unit
 ) {
     F4cetMobileTheme {
         Column(
@@ -37,7 +34,7 @@ fun CartScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Cart Screen (Placeholder)",
+                    text = "Profile Screen (Placeholder)",
                     style = androidx.compose.material3.MaterialTheme.typography.headlineMedium
                 )
             }

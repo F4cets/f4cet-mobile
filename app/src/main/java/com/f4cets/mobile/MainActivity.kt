@@ -45,6 +45,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlinx.coroutines.tasks.await
+import androidx.compose.foundation.clickable
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -94,7 +95,9 @@ fun AppNavigation() {
                 userProfile = userProfile,
                 onUserProfileUpdated = { userProfile = it },
                 navigateToAffiliates = { navController.navigate("affiliatesScreen") },
-                navigateToMarketplace = { navController.navigate("marketplaceScreen") }
+                navigateToMarketplace = { navController.navigate("marketplaceScreen") },
+                navigateToProfile = { navController.navigate("profileScreen") },
+                navigateToCart = { navController.navigate("cartScreen") } // CHANGED: Added navigateToCart
             )
         }
         composable("affiliatesScreen") {
@@ -137,16 +140,22 @@ fun AppNavigation() {
                 navigateToAffiliates = { navController.navigate("affiliatesScreen") },
                 navigateToStore = { storeId -> navController.navigate("storeScreen/$storeId") },
                 navigateToProduct = { productId -> navController.navigate("productScreen/$productId") },
-                navigateToCart = { navController.navigate("cartScreen") } // CHANGED: Added navigateToCart
+                navigateToCart = { navController.navigate("cartScreen") }
             )
         }
-        composable("cartScreen") { // CHANGED: Added placeholder cartScreen route
-            Text(
-                text = "Cart Screen (Placeholder)",
-                style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .wrapContentSize(Alignment.Center)
+        composable("cartScreen") { // CHANGED: Uncommented cartScreen route
+            CartScreen(
+                userProfile = userProfile,
+                navigateBack = { navController.popBackStack() },
+                navigateToAffiliates = { navController.navigate("affiliatesScreen") },
+                navigateToStore = { storeId -> navController.navigate("storeScreen/$storeId") },
+                navigateToProduct = { productId -> navController.navigate("productScreen/$productId") }
+            )
+        }
+        composable("profileScreen") {
+            ProfileScreen(
+                userProfile = userProfile,
+                navigateBack = { navController.popBackStack() }
             )
         }
     }
@@ -183,7 +192,9 @@ fun MainScreen(
     userProfile: User.Profile?,
     onUserProfileUpdated: (User.Profile?) -> Unit,
     navigateToAffiliates: () -> Unit,
-    navigateToMarketplace: () -> Unit
+    navigateToMarketplace: () -> Unit,
+    navigateToProfile: () -> Unit,
+    navigateToCart: () -> Unit // CHANGED: Added navigateToCart parameter
 ) {
     var affiliateClicks by remember { mutableStateOf<List<AffiliateClick>>(emptyList()) }
     var logoUrls by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
@@ -334,6 +345,7 @@ fun MainScreen(
                         .align(Alignment.TopStart)
                         .padding(top = 24.dp, start = 24.dp)
                         .size(56.dp)
+                        .clickable { navigateToProfile() }
                 ) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
@@ -358,7 +370,7 @@ fun MainScreen(
                     }
                 }
                 FloatingActionButton(
-                    onClick = { /* Placeholder for shopping cart action */ },
+                    onClick = { navigateToCart() }, // CHANGED: Added navigation to cartScreen
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier
@@ -635,7 +647,7 @@ fun MainScreen(
                                 }
                             }
                             FloatingActionButton(
-                                onClick = { /* Placeholder for Profile action */ },
+                                onClick = { navigateToProfile() },
                                 containerColor = MaterialTheme.colorScheme.secondary,
                                 contentColor = MaterialTheme.colorScheme.onSecondary,
                                 modifier = Modifier
@@ -749,7 +761,9 @@ fun MainScreenPreview() {
             userProfile = null,
             onUserProfileUpdated = {},
             navigateToAffiliates = {},
-            navigateToMarketplace = {}
+            navigateToMarketplace = {},
+            navigateToProfile = {},
+            navigateToCart = {} // CHANGED: Added navigateToCart to preview
         )
     }
 }
