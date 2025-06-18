@@ -39,7 +39,7 @@ android {
         compose = true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.15"
+        kotlinCompilerExtensionVersion = "2.0.20" // CHANGED: Updated to match Kotlin 2.0.20
     }
     packaging {
         resources {

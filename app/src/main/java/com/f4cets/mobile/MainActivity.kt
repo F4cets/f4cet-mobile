@@ -5,6 +5,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -45,7 +47,6 @@ import com.google.firebase.firestore.FirebaseFirestore
 import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlinx.coroutines.tasks.await
-import androidx.compose.foundation.clickable
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,7 +65,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// Helper function to format date
 fun formatDate(timestamp: String?): String {
     return timestamp?.let {
         try {
@@ -81,6 +81,7 @@ fun formatDate(timestamp: String?): String {
 fun AppNavigation() {
     val navController = rememberNavController()
     var userProfile by remember { mutableStateOf<User.Profile?>(null) }
+    val walletId = "2FbdM2GpXGPgkt8tFEWSyjfiZH2Un2qx7rcm78coSbh7"
 
     NavHost(navController = navController, startDestination = "homePrescreen") {
         composable("homePrescreen") {
@@ -97,7 +98,7 @@ fun AppNavigation() {
                 navigateToAffiliates = { navController.navigate("affiliatesScreen") },
                 navigateToMarketplace = { navController.navigate("marketplaceScreen") },
                 navigateToProfile = { navController.navigate("profileScreen") },
-                navigateToCart = { navController.navigate("cartScreen") } // CHANGED: Added navigateToCart
+                navigateToCart = { navController.navigate("cartScreen") }
             )
         }
         composable("affiliatesScreen") {
@@ -143,7 +144,7 @@ fun AppNavigation() {
                 navigateToCart = { navController.navigate("cartScreen") }
             )
         }
-        composable("cartScreen") { // CHANGED: Uncommented cartScreen route
+        composable("cartScreen") {
             CartScreen(
                 userProfile = userProfile,
                 navigateBack = { navController.popBackStack() },
@@ -153,10 +154,7 @@ fun AppNavigation() {
             )
         }
         composable("profileScreen") {
-            ProfileScreen(
-                userProfile = userProfile,
-                navigateBack = { navController.popBackStack() }
-            )
+            ProfileScreen(walletId = walletId)
         }
     }
 }
@@ -194,7 +192,7 @@ fun MainScreen(
     navigateToAffiliates: () -> Unit,
     navigateToMarketplace: () -> Unit,
     navigateToProfile: () -> Unit,
-    navigateToCart: () -> Unit // CHANGED: Added navigateToCart parameter
+    navigateToCart: () -> Unit
 ) {
     var affiliateClicks by remember { mutableStateOf<List<AffiliateClick>>(emptyList()) }
     var logoUrls by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
@@ -208,7 +206,6 @@ fun MainScreen(
         val db = FirebaseFirestore.getInstance()
         val walletId = "2FbdM2GpXGPgkt8tFEWSyjfiZH2Un2qx7rcm78coSbh7"
 
-        // Fetch affiliate clicks
         val clickDocuments = db.collection("users")
             .document(walletId)
             .collection("affiliateClicks")
@@ -223,7 +220,6 @@ fun MainScreen(
         }
         affiliateClicks = clicks
 
-        // Fetch affiliate logo URLs for clicks
         val urlMap = mutableMapOf<String, String>()
         if (clicks.isNotEmpty()) {
             val affiliateNames = clicks.map { it.affiliateName }.distinct()
@@ -243,7 +239,6 @@ fun MainScreen(
         }
         logoUrls = urlMap
 
-        // Fetch user profile
         val profileDoc = db.collection("users")
             .document(walletId)
             .get()
@@ -254,14 +249,14 @@ fun MainScreen(
                 name = profileMap["name"] as? String ?: "User",
                 avatar = profileMap["avatar"] as? String ?: "",
                 email = profileMap["email"] as? String ?: "",
-                nfts = (profileMap["nfts"] as? List<Map<String, Any>>) ?: emptyList()
+                nfts = (profileMap["nfts"] as? List<Map<String, Any>>) ?: emptyList(),
+                shippingAddress = profileMap["shippingAddress"] as? String ?: ""
             )
         } else {
             null
         }
         onUserProfileUpdated(newProfile)
 
-        // Fetch first 10 marketplace items
         val productDocuments = db.collection("products")
             .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
             .limit(10)
@@ -274,7 +269,6 @@ fun MainScreen(
         }
         marketplaceItems = items
 
-        // Fetch first 10 affiliates
         val affiliateDocuments = db.collection("affiliates")
             .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
             .limit(10)
@@ -289,7 +283,6 @@ fun MainScreen(
         }
         affiliateItems = affiliates
 
-        // Fetch transactions for order cards
         val transactionDocs = db.collection("transactions")
             .whereEqualTo("buyerId", walletId)
             .whereIn("status", listOf("Ordered", "Shipped", "Delivered"))
@@ -370,7 +363,7 @@ fun MainScreen(
                     }
                 }
                 FloatingActionButton(
-                    onClick = { navigateToCart() }, // CHANGED: Added navigation to cartScreen
+                    onClick = { navigateToCart() },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier
@@ -763,7 +756,7 @@ fun MainScreenPreview() {
             navigateToAffiliates = {},
             navigateToMarketplace = {},
             navigateToProfile = {},
-            navigateToCart = {} // CHANGED: Added navigateToCart to preview
+            navigateToCart = {}
         )
     }
 }

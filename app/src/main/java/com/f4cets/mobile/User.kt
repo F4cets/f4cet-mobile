@@ -2,7 +2,7 @@ package com.f4cets.mobile
 
 data class User(
     val walletId: String = "",
-    val role: String = "buyer", // Default to "buyer", can be "seller" or "god"
+    val role: String = "buyer",
     val isActive: Boolean = true,
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L,
@@ -16,7 +16,7 @@ data class User(
         val name: String = "User",
         val avatar: String = "/assets/images/default-avatar.png",
         val email: String = "",
-        // CHANGED: Updated nfts to handle nested maps (e.g., NFT objects)
-        val nfts: List<Map<String, Any>> = emptyList()
+        val nfts: List<Map<String, Any>> = emptyList(),
+        val shippingAddress: String = ""
     )
 }
