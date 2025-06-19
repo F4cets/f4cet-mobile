@@ -154,7 +154,16 @@ fun AppNavigation() {
             )
         }
         composable("profileScreen") {
-            ProfileScreen(walletId = walletId)
+            ProfileScreen(walletId = walletId, navController = navController)
+        }
+        composable(
+            "orderDetails/{orderId}",
+            arguments = listOf(navArgument("orderId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            OrderdetailsScreen(
+                orderId = backStackEntry.arguments?.getString("orderId") ?: "",
+                navController = navController
+            )
         }
     }
 }

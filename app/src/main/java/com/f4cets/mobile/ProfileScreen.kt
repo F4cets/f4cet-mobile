@@ -22,6 +22,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.firestore.ktx.toObject
@@ -31,17 +32,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import okhttp3.*
 import java.io.IOException
-import java.util.UUID
-import java.util.Locale
+import java.util.*
 
 @Composable
-fun ProfileScreen(walletId: String) {
+fun ProfileScreen(walletId: String, navController: NavController) {
     val db = Firebase.firestore
     val storage = Firebase.storage
     val coroutineScope = rememberCoroutineScope()
     var user by remember { mutableStateOf<User?>(null) }
     var affiliateClicks by remember { mutableStateOf<List<AffiliateClick>>(emptyList()) }
-    var transactions by remember { mutableStateOf<List<Map<String, Any>>>(emptyList()) }
+    var orderCards by remember { mutableStateOf<List<OrderCardData>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var avatarUri by remember { mutableStateOf<Uri?>(null) }
@@ -83,7 +83,28 @@ fun ProfileScreen(walletId: String) {
                 .limit(5)
                 .get()
                 .await()
-            transactions = txDocs.documents.mapNotNull { it.data }
+            orderCards = txDocs.documents.mapNotNull { doc ->
+                val transId = doc.id
+                val amount = doc.getDouble("amount")?.toString() ?: "0"
+                val currency = doc.getString("currency") ?: "SOL"
+                val status = doc.getString("status") ?: "Ordered"
+                val createdAt = doc.getString("createdAt")?.let { formatDate(it) } ?: "Unknown"
+                val productIds = doc.get("productIds") as? List<String> ?: emptyList()
+                if (productIds.isNotEmpty()) {
+                    val productId = productIds[0]
+                    val productDoc = db.collection("products").document(productId).get().await()
+                    val productName = productDoc.getString("name") ?: "Unknown Product"
+                    val imageUrl = productDoc.getString("selectedImage") ?: ""
+                    val type = productDoc.getString("type") ?: ""
+                    if (type == "digital" || type == "rwi") {
+                        OrderCardData(productName, createdAt, "$amount $currency", status, imageUrl, transId)
+                    } else {
+                        null
+                    }
+                } else {
+                    null
+                }
+            }
 
             isLoading = false
         } catch (e: Exception) {
@@ -124,14 +145,15 @@ fun ProfileScreen(walletId: String) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Header Section
             item {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -184,7 +206,9 @@ fun ProfileScreen(walletId: String) {
             // Settings Section
             item {
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = CardColors(
                         containerColor = MaterialTheme.colorScheme.surface,
@@ -267,7 +291,7 @@ fun ProfileScreen(walletId: String) {
                                     try {
                                         val client = OkHttpClient()
                                         val requestBody = FormBody.Builder()
-                                            .add("walletAddress", walletId) // CHANGED: Use walletAddress
+                                            .add("walletAddress", walletId)
                                             .add("mintAddress", nftMintAddress)
                                             .build()
                                         val request = Request.Builder()
@@ -317,7 +341,9 @@ fun ProfileScreen(walletId: String) {
             // Badges Section
             item {
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = CardColors(
                         containerColor = MaterialTheme.colorScheme.surface,
@@ -402,9 +428,11 @@ fun ProfileScreen(walletId: String) {
             }
 
             // Affiliate Activity Section
-            item { // CHANGED: Added section header
+            item {
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = CardColors(
                         containerColor = MaterialTheme.colorScheme.surface,
@@ -463,39 +491,35 @@ fun ProfileScreen(walletId: String) {
             }
 
             // Marketplace Orders Section
-            item { // CHANGED: Added section header
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                        disabledContainerColor = Color.Transparent,
-                        disabledContentColor = Color.Transparent
+            item {
+                Text(
+                    text = "Marketplace Orders",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp)
+                )
+                if (orderCards.isEmpty()) {
+                    Text(
+                        text = "No orders found",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 16.dp, bottom = 8.dp)
                     )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "Marketplace Orders",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        if (transactions.isEmpty()) {
-                            Text(
-                                text = "No orders found",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
                 }
             }
-            items(items = transactions.take(5)) { tx ->
+            // CHANGED: Removed OrderCard nesting, integrated data into Card
+            items(items = orderCards.take(5)) { orderCard ->
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            if (orderCard.transId.isNotBlank()) {
+                                Log.d("ProfileScreen", "Navigating to orderDetails/${orderCard.transId}")
+                                navController.navigate("orderDetails/${orderCard.transId}")
+                            } else {
+                                Log.e("ProfileScreen", "Invalid transId for order: $orderCard")
+                            }
+                        },
                     shape = RoundedCornerShape(12.dp),
                     colors = CardColors(
                         containerColor = MaterialTheme.colorScheme.surface,
@@ -504,30 +528,47 @@ fun ProfileScreen(walletId: String) {
                         disabledContentColor = Color.Transparent
                     )
                 ) {
-                    ListItem(
-                        headlineContent = {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        AsyncImage(
+                            model = orderCard.imageUrl,
+                            contentDescription = "Order Image",
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                            contentScale = ContentScale.Crop
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
                             Text(
-                                text = "Order #${tx["txId"] as? String ?: "Unknown"}",
+                                text = orderCard.productName,
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
-                        },
-                        supportingContent = {
                             Text(
-                                text = "Amount: ${tx["amount"] as? Double ?: 0.0} ${tx["currency"]}",
+                                text = orderCard.orderDate,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                        },
-                        trailingContent = {
                             Text(
-                                text = tx["status"] as? String ?: "Unknown",
+                                text = orderCard.amount,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = if (tx["status"] == "Ordered") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                                color = MaterialTheme.colorScheme.onSurface
                             )
-                        },
-                        modifier = Modifier.clickable { /* Placeholder: Navigate to Order Details */ }
-                    )
+                        }
+                        Text(
+                            text = orderCard.status,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             }
 
